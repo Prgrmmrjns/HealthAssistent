@@ -1,0 +1,64 @@
+{% extends "fitness/base.html" %}
+{% block title %}{{ template.name }} — GarminClaw{% endblock %}
+
+{% block content %}
+<a href="{% url 'fitness:template_list' %}" style="font-size:.85rem;color:var(--text-muted)">← My Templates</a>
+
+<div class="flex justify-between items-center mt-1 mb-1">
+  <h1 style="margin-bottom:0">{{ template.name }}</h1>
+  <div class="flex gap-sm">
+    <a href="{% url 'fitness:template_edit' template.pk %}" class="btn btn-ghost btn-sm">Edit</a>
+    <form method="post" action="{% url 'fitness:template_delete' template.pk %}" style="display:inline" onsubmit="return confirm('Delete this template?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+    </form>
+  </div>
+</div>
+
+{% if template.description %}
+<p style="color:var(--text-muted);margin-bottom:1.5rem">{{ template.description }}</p>
+{% endif %}
+
+<div class="stat-grid mb-2">
+  <div class="stat-card">
+    <div class="value accent">{{ template.exercise_count }}</div>
+    <div class="label">Exercises</div>
+  </div>
+  <div class="stat-card">
+    <div class="value green">{{ template.total_sets }}</div>
+    <div class="label">Total Sets</div>
+  </div>
+</div>
+
+{% if exercises %}
+<div class="section-title">Exercises</div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Exercise</th>
+        <th>Sets</th>
+        <th>Reps</th>
+        <th>Weight (kg)</th>
+        <th>Rest (sec)</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in exercises %}
+      <tr>
+        <td style="font-family:var(--mono);color:var(--text-muted)">{{ forloop.counter }}</td>
+        <td><strong>{{ e.display_name }}</strong>{% if e.exercise.muscle_group %}<br><span style="font-size:.75rem;color:var(--text-muted)">{{ e.exercise.muscle_group }}</span>{% endif %}</td>
+        <td>{{ e.sets }}</td>
+        <td>{{ e.reps }}</td>
+        <td>{% if e.weight_kg %}{{ e.weight_kg }}{% else %}—{% endif %}</td>
+        <td>{{ e.rest_sec }}s</td>
+        <td style="color:var(--text-muted);font-size:.8rem">{{ e.notes }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

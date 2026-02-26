@@ -1,0 +1,70 @@
+{% extends "fitness/base.html" %}
+{% block title %}LISA — {{ meal.get_meal_type_display }} {{ meal.date }}{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-2">
+  <div>
+    <h1>{{ meal.get_meal_type_display }}</h1>
+    <p class="subtitle">{{ meal.date|date:"l, F j Y" }}</p>
+  </div>
+  <div class="flex gap-sm">
+    <a href="{% url 'fitness:meal_list' %}" class="btn btn-ghost btn-sm">← Meals</a>
+    <form method="post" action="{% url 'fitness:meal_delete' meal.pk %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this meal?')">Delete</button>
+    </form>
+  </div>
+</div>
+
+{% if meal.image %}
+<div style="margin-bottom:1.5rem;">
+  <img src="{{ meal.image.url }}" alt="Meal photo" style="max-width:100%;max-height:400px;border-radius:var(--radius);border:1px solid var(--border);">
+</div>
+{% endif %}
+
+{% if meal.description %}
+<div class="stat-card mb-2">
+  <div class="label">Description</div>
+  <div style="margin-top:.4rem;">{{ meal.description }}</div>
+</div>
+{% endif %}
+
+{% if meal.calories_est %}
+<h2 class="section-title">Estimated Nutrition</h2>
+<div class="macro-bar">
+  <div class="macro-item">
+    <div class="macro-val" style="color:var(--accent);">{{ meal.calories_est }}</div>
+    <div class="macro-label">Calories</div>
+  </div>
+  <div class="macro-item">
+    <div class="macro-val" style="color:var(--blue);">{{ meal.protein_g|floatformat:1 }}g</div>
+    <div class="macro-label">Protein</div>
+  </div>
+  <div class="macro-item">
+    <div class="macro-val" style="color:var(--orange);">{{ meal.carbs_g|floatformat:1 }}g</div>
+    <div class="macro-label">Carbs</div>
+  </div>
+  <div class="macro-item">
+    <div class="macro-val" style="color:var(--pink);">{{ meal.fat_g|floatformat:1 }}g</div>
+    <div class="macro-label">Fat</div>
+  </div>
+  {% if meal.fiber_g %}
+  <div class="macro-item">
+    <div class="macro-val" style="color:var(--green);">{{ meal.fiber_g|floatformat:1 }}g</div>
+    <div class="macro-label">Fiber</div>
+  </div>
+  {% endif %}
+</div>
+{% else %}
+<div class="stat-card" style="border-color:var(--yellow);">
+  <div class="label" style="color:var(--yellow);">No AI analysis available</div>
+  <div style="font-size:.85rem;color:var(--text-muted);margin-top:.3rem;">The image or description could not be analyzed. Make sure MISTRAL_AI_API_KEY is set in .env.</div>
+</div>
+{% endif %}
+
+{% if meal.ai_analysis %}
+<details style="margin-top:1.5rem;">
+  <summary style="cursor:pointer;font-size:.82rem;color:var(--text-muted);font-weight:600;">Raw AI Response</summary>
+  <pre style="margin-top:.5rem;background:var(--bg-card);padding:1rem;border-radius:var(--radius-sm);font-size:.78rem;overflow-x:auto;border:1px solid var(--border);font-family:var(--mono);color:var(--text-muted);">{{ meal.ai_analysis }}</pre>
+</details>
+{% endif %}
+{% endblock %}

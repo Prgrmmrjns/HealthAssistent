@@ -1,0 +1,29 @@
+{% extends "fitness/base.html" %}
+{% block title %}My Templates — GarminClaw{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-1">
+  <div>
+    <h1>My Templates</h1>
+    <p class="subtitle">Create and manage your custom workout routines</p>
+  </div>
+  <a href="{% url 'fitness:template_create' %}" class="btn btn-primary">+ New Template</a>
+</div>
+
+{% if templates %}
+<div class="template-grid">
+  {% for t in templates %}
+  <a href="{% url 'fitness:template_detail' t.pk %}" class="template-card" style="color:var(--text)">
+    <h3>{{ t.name }}</h3>
+    <div class="meta">{{ t.exercise_count }} exercises · {{ t.total_sets }} total sets</div>
+    {% if t.description %}<div class="desc">{{ t.description }}</div>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <p>No templates yet. Create your first workout template!</p>
+  <a href="{% url 'fitness:template_create' %}" class="btn btn-primary mt-1">+ New Template</a>
+</div>
+{% endif %}
+{% endblock %}

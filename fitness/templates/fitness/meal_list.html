@@ -1,0 +1,60 @@
+{% extends "fitness/base.html" %}
+{% block title %}LISA — Meals{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-2">
+  <div>
+    <h1>Meal Tracker</h1>
+    <p class="subtitle">Log what you eat — AI estimates macros from photos</p>
+  </div>
+  <a href="{% url 'fitness:meal_add' %}" class="btn btn-primary">+ Log Meal</a>
+</div>
+
+<!-- Today's Totals -->
+<div class="stat-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:2rem;">
+  <div class="stat-card">
+    <div class="value accent">{{ today_cals }}</div>
+    <div class="label">Calories Today</div>
+  </div>
+  <div class="stat-card">
+    <div class="value blue">{{ today_protein|floatformat:0 }}g</div>
+    <div class="label">Protein</div>
+  </div>
+  <div class="stat-card">
+    <div class="value orange">{{ today_carbs|floatformat:0 }}g</div>
+    <div class="label">Carbs</div>
+  </div>
+  <div class="stat-card">
+    <div class="value pink">{{ today_fat|floatformat:0 }}g</div>
+    <div class="label">Fat</div>
+  </div>
+</div>
+
+{% if meals %}
+<div class="template-grid">
+  {% for m in meals %}
+  <a href="{% url 'fitness:meal_detail' m.pk %}" class="meal-card" style="text-decoration:none;">
+    {% if m.image %}
+    <img src="{{ m.image.url }}" alt="Meal photo">
+    {% else %}
+    <div style="height:80px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:2rem;">🍽️</div>
+    {% endif %}
+    <div class="meal-body">
+      <div class="meal-type">{{ m.get_meal_type_display }} · {{ m.date }}</div>
+      <div class="meal-desc">{{ m.description|default:"No description" }}</div>
+      <div class="meal-macros">
+        {% if m.calories_est %}<span>{{ m.calories_est }} kcal</span>{% endif %}
+        {% if m.protein_g %}<span>P {{ m.protein_g|floatformat:0 }}g</span>{% endif %}
+        {% if m.carbs_g %}<span>C {{ m.carbs_g|floatformat:0 }}g</span>{% endif %}
+        {% if m.fat_g %}<span>F {{ m.fat_g|floatformat:0 }}g</span>{% endif %}
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <p>No meals logged yet. Snap a photo or describe your food!</p>
+  <a href="{% url 'fitness:meal_add' %}" class="btn btn-primary mt-1">Log First Meal</a>
+</div>
+{% endif %}
+{% endblock %}

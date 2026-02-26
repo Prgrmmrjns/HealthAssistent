@@ -1,0 +1,88 @@
+{% extends "fitness/base.html" %}
+{% block title %}{{ workout.name }} — GarminClaw{% endblock %}
+
+{% block content %}
+<a href="{% url 'fitness:workout_list' %}" style="font-size:.85rem;color:var(--text-muted)">← All Workouts</a>
+
+<div class="flex items-center gap-md mt-1 mb-1">
+  <h1 style="margin-bottom:0">{{ workout.name }}</h1>
+  <span class="badge {% if workout.sport == 'Strength Training' %}badge-strength{% elif workout.sport == 'Running' %}badge-running{% elif workout.sport == 'Cycling' %}badge-cycling{% else %}badge-other{% endif %}" style="font-size:.8rem">
+    {{ workout.sport }}
+  </span>
+</div>
+<p class="subtitle">{{ workout.date|date:"l, F j, Y" }}</p>
+
+<div class="stat-grid">
+  {% if workout.duration_min %}
+  <div class="stat-card"><div class="value">{{ workout.duration_min|floatformat:1 }}</div><div class="label">Duration (min)</div></div>
+  {% endif %}
+  {% if workout.distance_km %}
+  <div class="stat-card"><div class="value green">{{ workout.distance_km|floatformat:2 }}</div><div class="label">Distance (km)</div></div>
+  {% endif %}
+  {% if workout.calories %}
+  <div class="stat-card"><div class="value orange">{{ workout.calories|floatformat:0 }}</div><div class="label">Calories</div></div>
+  {% endif %}
+  {% if workout.avg_hr %}
+  <div class="stat-card"><div class="value red">{{ workout.avg_hr|floatformat:0 }}</div><div class="label">Avg HR</div></div>
+  {% endif %}
+  {% if workout.max_hr %}
+  <div class="stat-card"><div class="value red">{{ workout.max_hr|floatformat:0 }}</div><div class="label">Max HR</div></div>
+  {% endif %}
+</div>
+
+{% if exercise_summary %}
+<div class="section-title">Exercise Summary</div>
+<div class="table-wrap mb-2">
+  <table>
+    <thead>
+      <tr>
+        <th>Exercise</th>
+        <th>Sets</th>
+        <th>Total Reps</th>
+        <th>Max Weight (kg)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for name, data in exercise_summary.items %}
+      <tr>
+        <td><strong>{{ name }}</strong></td>
+        <td>{{ data.sets }}</td>
+        <td>{% if data.total_reps %}{{ data.total_reps }}{% else %}—{% endif %}</td>
+        <td>{% if data.max_weight != None %}{{ data.max_weight }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if sets %}
+<div class="section-title">All Sets</div>
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Exercise</th>
+        <th>Type</th>
+        <th>Reps</th>
+        <th>Weight (kg)</th>
+        <th>Duration (sec)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sets %}
+      <tr>
+        <td style="font-family:var(--mono);color:var(--text-muted)">{{ s.order }}</td>
+        <td>{{ s.exercise }}</td>
+        <td><span class="badge {% if s.set_type == 'Active' %}badge-active{% elif s.set_type == 'Warmup' %}badge-warmup{% else %}badge-other{% endif %}">{{ s.set_type }}</span></td>
+        <td>{% if s.reps != None %}{{ s.reps }}{% else %}—{% endif %}</td>
+        <td>{% if s.weight_kg != None %}{{ s.weight_kg }}{% else %}—{% endif %}</td>
+        <td>{% if s.duration_sec != None %}{{ s.duration_sec|floatformat:1 }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

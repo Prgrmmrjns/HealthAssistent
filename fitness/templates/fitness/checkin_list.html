@@ -1,0 +1,49 @@
+{% extends "fitness/base.html" %}
+{% block title %}LISA — Check-ins{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-2">
+  <div>
+    <h1>Daily Check-ins</h1>
+    <p class="subtitle">Track your mood, energy, stress and more</p>
+  </div>
+  <a href="{% url 'fitness:checkin_today' %}" class="btn btn-primary">Today's Check-in</a>
+</div>
+
+{% if checkins %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Mood</th>
+        <th>Energy</th>
+        <th>Stress</th>
+        <th>Sleep</th>
+        <th>Hydration</th>
+        {% if not has_garmin %}<th>Exercise</th>{% endif %}
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for c in checkins %}
+    <tr>
+      <td><a href="{% url 'fitness:checkin_date' c.date|date:'Y-m-d' %}">{{ c.date }}</a></td>
+      <td>{% if c.mood %}{% for i in "12345" %}{% if forloop.counter <= c.mood %}⭐{% endif %}{% endfor %}{% else %}—{% endif %}</td>
+      <td>{% if c.energy %}{% for i in "12345" %}{% if forloop.counter <= c.energy %}⚡{% endif %}{% endfor %}{% else %}—{% endif %}</td>
+      <td>{% if c.stress %}<span class="badge badge-{% if c.stress == 'low' %}active{% elif c.stress == 'medium' %}warmup{% elif c.stress == 'high' %}strength{% else %}strength{% endif %}">{{ c.get_stress_display }}</span>{% else %}—{% endif %}</td>
+      <td>{% if c.sleep_quality %}{{ c.sleep_quality }}/5{% elif c.sleep_hours_manual %}{{ c.sleep_hours_manual }}h{% else %}—{% endif %}</td>
+      <td>{% if c.hydration_litres %}{{ c.hydration_litres }}L{% else %}—{% endif %}</td>
+      {% if not has_garmin %}<td>{% if c.exercise_minutes %}{{ c.exercise_minutes }} min{% else %}—{% endif %}</td>{% endif %}
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ c.notes|truncatechars:40 }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <p>No check-ins yet. Start tracking your wellbeing today!</p>
+  <a href="{% url 'fitness:checkin_today' %}" class="btn btn-primary mt-1">Start Check-in</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends "fitness/base.html" %}
+{% block title %}LISA — Dashboard{% endblock %}
+{% block content %}
+<div class="flex items-center justify-between mb-2">
+  <div>
+    <h1>Welcome{% if profile.name %}, {{ profile.name }}{% endif %}</h1>
+    <p class="subtitle">Your lifestyle at a glance</p>
+  </div>
+  {% if not profile.name %}
+  <a href="{% url 'fitness:profile' %}" class="btn btn-primary btn-sm">Set up profile</a>
+  {% endif %}
+</div>
+
+<!-- Quick Actions -->
+<div class="stat-grid" style="grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));">
+  <a href="{% url 'fitness:checkin_today' %}" class="stat-card" style="text-decoration:none;text-align:center;">
+    <div class="value accent">{% if today_checkin %}✓{% else %}+{% endif %}</div>
+    <div class="label">{% if today_checkin %}Checked in today{% else %}Daily Check-in{% endif %}</div>
+  </a>
+  <a href="{% url 'fitness:meal_add' %}" class="stat-card" style="text-decoration:none;text-align:center;">
+    <div class="value green">{{ today_meals.count }}</div>
+    <div class="label">Meals Today · {{ today_cals }} kcal</div>
+  </a>
+  <a href="{% url 'fitness:workout_list' %}" class="stat-card" style="text-decoration:none;text-align:center;">
+    <div class="value blue">{{ total_workouts }}</div>
+    <div class="label">Total Workouts</div>
+  </a>
+  <a href="{% url 'fitness:progress' %}" class="stat-card" style="text-decoration:none;text-align:center;">
+    <div class="value orange">{% if latest_vo2 %}{{ latest_vo2.vo2_max|floatformat:0 }}{% else %}—{% endif %}</div>
+    <div class="label">VO₂ Max</div>
+  </a>
+</div>
+
+<!-- Stats Row -->
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="value accent">{{ strength_count }}</div>
+    <div class="label">Strength Sessions</div>
+  </div>
+  <div class="stat-card">
+    <div class="value green">{{ total_sets|default:"0" }}</div>
+    <div class="label">Total Sets</div>
+  </div>
+  <div class="stat-card">
+    <div class="value blue">{% if avg_duration %}{{ avg_duration|floatformat:0 }}{% else %}—{% endif %}</div>
+    <div class="label">Avg Duration (min)</div>
+  </div>
+  <div class="stat-card">
+    <div class="value orange">{% if latest_stats %}{{ latest_stats.steps|default:"—" }}{% else %}—{% endif %}</div>
+    <div class="label">Latest Steps</div>
+  </div>
+  <div class="stat-card">
+    <div class="value pink">{% if latest_weight %}{{ latest_weight.weight_kg|floatformat:1 }}{% else %}—{% endif %}</div>
+    <div class="label">Weight (kg)</div>
+  </div>
+  <div class="stat-card">
+    <div class="value red">{% if latest_stats %}{{ latest_stats.resting_hr|default:"—" }}{% else %}—{% endif %}</div>
+    <div class="label">Resting HR</div>
+  </div>
+</div>
+
+<!-- Recent Workouts -->
+<h2 class="section-title">Recent Workouts</h2>
+{% if recent_workouts %}
+<div class="table-wrap mb-2">
+  <table>
+    <thead><tr><th>Date</th><th>Name</th><th>Sport</th><th>Duration</th><th>Calories</th></tr></thead>
+    <tbody>
+    {% for w in recent_workouts %}
+    <tr>
+      <td>{{ w.date }}</td>
+      <td><a href="{% url 'fitness:workout_detail' w.pk %}">{{ w.name }}</a></td>
+      <td><span class="badge badge-{% if w.sport == 'Strength Training' %}strength{% elif w.sport == 'Running' %}running{% elif w.sport == 'Cycling' %}cycling{% else %}other{% endif %}">{{ w.sport }}</span></td>
+      <td>{% if w.duration_min %}{{ w.duration_min|floatformat:0 }} min{% else %}—{% endif %}</td>
+      <td>{% if w.calories %}{{ w.calories|floatformat:0 }}{% else %}—{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty mb-2">
+  <p>No workouts yet.</p>
+  <p>{% if profile.garmin_connected %}Run <code>python manage.py sync_garmin</code> to import Garmin data.{% else %}Connect Garmin or log workouts manually.{% endif %}</p>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "fitness/base.html" %}
+{% block title %}LISA — Profile{% endblock %}
+{% block content %}
+<h1>My Profile</h1>
+<p class="subtitle">Your health and lifestyle information</p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+
+  <!-- Avatar -->
+  <div class="profile-header">
+    {% if profile.profile_image %}
+    <img src="{{ profile.profile_image.url }}" alt="Profile" class="profile-avatar">
+    {% else %}
+    <div class="profile-avatar-placeholder">👤</div>
+    {% endif %}
+    <div>
+      <label for="id_profile_image">Profile Photo</label>
+      <input type="file" id="id_profile_image" name="profile_image" accept="image/*" style="width:auto">
+    </div>
+  </div>
+
+  <h2 class="section-title">Personal Info</h2>
+  <div class="form-grid cols-3">
+    <div class="form-group">
+      <label for="id_name">Name</label>
+      <input type="text" id="id_name" name="name" value="{{ profile.name }}" placeholder="Your name">
+    </div>
+    <div class="form-group">
+      <label for="id_age">Age</label>
+      <input type="number" id="id_age" name="age" value="{{ profile.age|default_if_none:'' }}" min="1" max="120">
+    </div>
+    <div class="form-group">
+      <label for="id_gender">Gender</label>
+      <select id="id_gender" name="gender">
+        <option value="">Prefer not to say</option>
+        <option value="M" {% if profile.gender == 'M' %}selected{% endif %}>Male</option>
+        <option value="F" {% if profile.gender == 'F' %}selected{% endif %}>Female</option>
+        <option value="O" {% if profile.gender == 'O' %}selected{% endif %}>Other</option>
+      </select>
+    </div>
+  </div>
+
+  <h2 class="section-title">Body & Fitness</h2>
+  <div class="form-grid cols-3">
+    <div class="form-group">
+      <label for="id_height_cm">Height (cm)</label>
+      <input type="number" step="0.1" id="id_height_cm" name="height_cm" value="{{ profile.height_cm|default_if_none:'' }}">
+    </div>
+    <div class="form-group">
+      <label for="id_weight_kg">Weight (kg)</label>
+      <input type="number" step="0.1" id="id_weight_kg" name="weight_kg" value="{{ profile.weight_kg|default_if_none:'' }}">
+    </div>
+    <div class="form-group">
+      <label for="id_activity_level">Activity Level</label>
+      <select id="id_activity_level" name="activity_level">
+        <option value="">Select…</option>
+        <option value="sedentary" {% if profile.activity_level == 'sedentary' %}selected{% endif %}>Sedentary</option>
+        <option value="light" {% if profile.activity_level == 'light' %}selected{% endif %}>Lightly Active</option>
+        <option value="moderate" {% if profile.activity_level == 'moderate' %}selected{% endif %}>Moderately Active</option>
+        <option value="active" {% if profile.activity_level == 'active' %}selected{% endif %}>Very Active</option>
+      </select>
+    </div>
+  </div>
+
+  <h2 class="section-title">Lifestyle</h2>
+  <div class="form-grid">
+    <div class="form-group">
+      <label for="id_profession">Profession</label>
+      <input type="text" id="id_profession" name="profession" value="{{ profile.profession }}" placeholder="e.g. Software Engineer">
+    </div>
+    <div class="form-group">
+      <label for="id_goals">Goals</label>
+      <input type="text" id="id_goals" name="goals" value="{{ profile.goals }}" placeholder="e.g. Lose weight, sleep better">
+    </div>
+    <div class="form-group form-full">
+      <label for="id_health_conditions">Health Conditions / Notes</label>
+      <textarea id="id_health_conditions" name="health_conditions" rows="3" placeholder="Allergies, chronic conditions, medications…">{{ profile.health_conditions }}</textarea>
+    </div>
+  </div>
+
+  <div class="flex gap-sm mt-1">
+    <button type="submit" class="btn btn-primary">Save Profile</button>
+  </div>
+</form>
+
+{% if profile.garmin_connected %}
+<div class="stat-card mt-1" style="border-color:var(--green);">
+  <div class="value green" style="font-size:1rem;">✓ Garmin Connected</div>
+  <div class="label">Data is synced from your Garmin account</div>
+</div>
+{% else %}
+<div class="stat-card mt-1" style="border-color:var(--yellow);">
+  <div class="value" style="font-size:1rem;color:var(--yellow);">⚡ No Garmin</div>
+  <div class="label">LISA will ask extra questions about your activity in daily check-ins</div>
+</div>
+{% endif %}
+{% endblock %}

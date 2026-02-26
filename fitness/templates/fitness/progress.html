@@ -1,0 +1,140 @@
+{% extends "fitness/base.html" %}
+{% block title %}Progress — GarminClaw{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+{% endblock %}
+
+{% block content %}
+<div class="flex justify-between items-center mb-1">
+  <div>
+    <h1>Progress</h1>
+    <p class="subtitle">Track your trends over time</p>
+  </div>
+  <div class="flex gap-sm">
+    <a href="?days=7" class="btn {% if days == 7 %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">7d</a>
+    <a href="?days=30" class="btn {% if days == 30 %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">30d</a>
+    <a href="?days=90" class="btn {% if days == 90 %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">90d</a>
+    <a href="?days=365" class="btn {% if days == 365 %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">1y</a>
+  </div>
+</div>
+
+<div class="chart-grid">
+  <div class="chart-card">
+    <h3>Daily Steps</h3>
+    <canvas id="chart-steps"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Weight (kg)</h3>
+    <canvas id="chart-weight"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Resting Heart Rate</h3>
+    <canvas id="chart-hr"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Sleep (hours)</h3>
+    <canvas id="chart-sleep"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>VO2 Max</h3>
+    <canvas id="chart-vo2"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>HRV</h3>
+    <canvas id="chart-hrv"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Avg Stress</h3>
+    <canvas id="chart-stress"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Body Battery (High / Low)</h3>
+    <canvas id="chart-battery"></canvas>
+  </div>
+  <div class="chart-card">
+    <h3>Calories</h3>
+    <canvas id="chart-calories"></canvas>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const D = JSON.parse('{{ chart_data|escapejs }}');
+
+const baseOpts = {
+  responsive: true,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+    y: { ticks: { color: '#71717a', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,.04)' } },
+  },
+  elements: { point: { radius: 2 }, line: { tension: .3, borderWidth: 2 } },
+};
+
+function filt(dates, values) {
+  const d = [], v = [];
+  for (let i = 0; i < dates.length; i++) {
+    if (values[i] != null) { d.push(dates[i]); v.push(values[i]); }
+  }
+  return { dates: d, values: v };
+}
+
+function lineChart(id, label, values, color) {
+  const f = filt(D.dates, values);
+  if (!f.values.length) {
+    document.getElementById(id).closest('.chart-card').style.display = 'none';
+    return;
+  }
+  new Chart(document.getElementById(id), {
+    type: 'line',
+    data: { labels: f.dates, datasets: [{ label, data: f.values, borderColor: color, backgroundColor: color + '22', fill: true }] },
+    options: baseOpts,
+  });
+}
+
+function barChart(id, label, values, color) {
+  const f = filt(D.dates, values);
+  if (!f.values.length) {
+    document.getElementById(id).closest('.chart-card').style.display = 'none';
+    return;
+  }
+  new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: { labels: f.dates, datasets: [{ label, data: f.values, backgroundColor: color + '88', borderColor: color, borderWidth: 1, borderRadius: 3 }] },
+    options: { ...baseOpts, plugins: { legend: { display: false } } },
+  });
+}
+
+barChart('chart-steps', 'Steps', D.steps, '#22c55e');
+lineChart('chart-weight', 'Weight', D.weight, '#f97316');
+lineChart('chart-hr', 'Resting HR', D.resting_hr, '#ef4444');
+barChart('chart-sleep', 'Sleep (h)', D.sleep, '#6366f1');
+lineChart('chart-vo2', 'VO2 Max', D.vo2_max, '#3b82f6');
+lineChart('chart-hrv', 'HRV', D.hrv, '#22c55e');
+lineChart('chart-stress', 'Stress', D.stress, '#eab308');
+barChart('chart-calories', 'Calories', D.calories, '#f97316');
+
+// Body Battery: dual dataset
+(function() {
+  const fh = filt(D.dates, D.body_battery_high);
+  const fl = filt(D.dates, D.body_battery_low);
+  if (!fh.values.length && !fl.values.length) {
+    document.getElementById('chart-battery').closest('.chart-card').style.display = 'none';
+    return;
+  }
+  new Chart(document.getElementById('chart-battery'), {
+    type: 'line',
+    data: {
+      labels: D.dates,
+      datasets: [
+        { label: 'High', data: D.body_battery_high, borderColor: '#22c55e', backgroundColor: '#22c55e22', fill: false },
+        { label: 'Low', data: D.body_battery_low, borderColor: '#ef4444', backgroundColor: '#ef444422', fill: false },
+      ]
+    },
+    options: { ...baseOpts, plugins: { legend: { display: true, labels: { color: '#71717a', font: { size: 11 } } } } },
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "fitness/base.html" %}
+{% block title %}LISA — Log Meal{% endblock %}
+{% block content %}
+<h1>Log a Meal</h1>
+<p class="subtitle">Upload a photo and/or describe what you ate — AI will estimate macros</p>
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="form-grid cols-3">
+    <div class="form-group">
+      <label for="id_date">Date</label>
+      <input type="date" id="id_date" name="date" value="{{ today|date:'Y-m-d' }}">
+    </div>
+    <div class="form-group">
+      <label for="id_meal_type">Meal Type</label>
+      <select id="id_meal_type" name="meal_type">
+        <option value="breakfast">Breakfast</option>
+        <option value="lunch">Lunch</option>
+        <option value="dinner">Dinner</option>
+        <option value="snack">Snack</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="id_image">Photo (optional)</label>
+      <input type="file" id="id_image" name="image" accept="image/*">
+    </div>
+  </div>
+
+  <div class="form-group" style="margin-top:1rem;">
+    <label for="id_description">Description</label>
+    <textarea id="id_description" name="description" rows="3" placeholder="e.g. Grilled chicken breast with rice and steamed broccoli, glass of orange juice"></textarea>
+    <div style="font-size:.72rem;color:var(--text-muted);margin-top:.3rem;">Tip: If you upload a photo, AI can analyze it directly. A text description also works or helps refine the estimate.</div>
+  </div>
+
+  <!-- Preview -->
+  <div id="preview" style="display:none;margin:1rem 0;">
+    <img id="preview_img" style="max-width:300px;border-radius:var(--radius);border:1px solid var(--border);">
+  </div>
+
+  <div class="flex gap-sm mt-1">
+    <button type="submit" class="btn btn-primary">Analyze & Save</button>
+    <a href="{% url 'fitness:meal_list' %}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+
+{% block extra_scripts %}
+<script>
+document.getElementById('id_image').addEventListener('change', function(e) {
+  const preview = document.getElementById('preview');
+  const img = document.getElementById('preview_img');
+  if (e.target.files && e.target.files[0]) {
+    const reader = new FileReader();
+    reader.onload = function(ev) { img.src = ev.target.result; preview.style.display = 'block'; };
+    reader.readAsDataURL(e.target.files[0]);
+  } else { preview.style.display = 'none'; }
+});
+</script>
+{% endblock %}
+{% endblock %}

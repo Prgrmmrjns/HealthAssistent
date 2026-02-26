@@ -1,0 +1,59 @@
+{% extends "fitness/base.html" %}
+{% block title %}Workouts — GarminClaw{% endblock %}
+
+{% block content %}
+<h1>Workouts</h1>
+<p class="subtitle">All your Garmin activities</p>
+
+<form class="filter-bar" method="get">
+  <select name="sport" onchange="this.form.submit()">
+    <option value="">All Sports</option>
+    {% for s in sports %}
+    <option value="{{ s }}" {% if s == current_sport %}selected{% endif %}>{{ s }}</option>
+    {% endfor %}
+  </select>
+</form>
+
+{% if workouts %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Name</th>
+        <th>Sport</th>
+        <th>Duration</th>
+        <th>Distance</th>
+        <th>Calories</th>
+        <th>Avg HR</th>
+        <th>Max HR</th>
+        <th>Sets</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for w in workouts %}
+      <tr>
+        <td style="font-family:var(--mono);font-size:.8rem">{{ w.date|date:"M d" }}</td>
+        <td><a href="{% url 'fitness:workout_detail' w.pk %}">{{ w.name }}</a></td>
+        <td>
+          <span class="badge {% if w.sport == 'Strength Training' %}badge-strength{% elif w.sport == 'Running' %}badge-running{% elif w.sport == 'Cycling' %}badge-cycling{% else %}badge-other{% endif %}">
+            {{ w.sport }}
+          </span>
+        </td>
+        <td>{% if w.duration_min %}{{ w.duration_min|floatformat:1 }}m{% else %}—{% endif %}</td>
+        <td>{% if w.distance_km %}{{ w.distance_km|floatformat:2 }} km{% else %}—{% endif %}</td>
+        <td>{% if w.calories %}{{ w.calories|floatformat:0 }}{% else %}—{% endif %}</td>
+        <td>{% if w.avg_hr %}{{ w.avg_hr|floatformat:0 }}{% else %}—{% endif %}</td>
+        <td>{% if w.max_hr %}{{ w.max_hr|floatformat:0 }}{% else %}—{% endif %}</td>
+        <td>{% if w.set_count %}{{ w.set_count }}{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty">
+  <p>No workouts found{% if current_sport %} for "{{ current_sport }}"{% endif %}.</p>
+</div>
+{% endif %}
+{% endblock %}
