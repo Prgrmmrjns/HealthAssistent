@@ -77,8 +77,26 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-if os.environ.get("DATABASE_URL"):
-    DATABASES = {"default": dj_database_url.config(conn_max_age=600)}
+def _get_database_url():
+    # Explicit env var (set manually or by Render Blueprint)
+    url = (
+        os.environ.get("DATABASE_URL")
+        or os.environ.get("DATABASE_INTERNAL_URL")
+        or os.environ.get("MY_DATA_DATABASE_URL")  # Render "my data" linked database
+    )
+    if url:
+        return url.strip().strip('"')
+    # Fallback: any env var ending with _DATABASE_URL that looks like postgres
+    for key, value in os.environ.items():
+        if key.endswith("_DATABASE_URL") and value and (
+            value.startswith("postgres://") or value.startswith("postgresql://")
+        ):
+            return value.strip().strip('"')
+    return None
+
+_db_url = _get_database_url()
+if _db_url:
+    DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600)}
 else:
     DATABASES = {
         "default": {

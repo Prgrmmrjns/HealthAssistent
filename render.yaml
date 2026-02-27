@@ -1,0 +1,26 @@
+# Render Blueprint - optional. Use this if creating services from scratch,
+# or sync to apply these settings to existing services.
+
+databases:
+  - name: healthassistent-db
+    plan: free
+
+services:
+  - type: web
+    name: healthassistent
+    runtime: python
+    plan: free
+
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input
+    startCommand: gunicorn config.wsgi:application
+    preDeployCommand: python manage.py migrate --no-input
+
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: healthassistent-db
+          property: connectionString
+      - key: GARMIN_EMAIL
+        sync: false
+      - key: GARMIN_PASSWORD
+        sync: false

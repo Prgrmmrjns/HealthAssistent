@@ -61,12 +61,14 @@ Open http://127.0.0.1:8000 and log in. The fitness dashboard is at `/fitness/`.
 
 1. Create a **PostgreSQL** database in the Render dashboard.
 2. Create a **Web Service** and connect your repo.
-3. Link the PostgreSQL database to the web service (Render will set `DATABASE_URL` automatically).
+3. Link the PostgreSQL database to the web service, **or** add `DATABASE_URL` manually:
+   - Open your PostgreSQL service → **Connect** → copy **Internal Database URL**
+   - In the Web Service → **Environment** → add variable: `DATABASE_URL` = that URL
 4. Add environment variables: `GARMIN_EMAIL`, `GARMIN_PASSWORD`, and optionally `DJANGO_SECRET_KEY`, `MISTRAL_AI_API_KEY`.
 5. Set these in the Render dashboard:
    - **Build Command:** `pip install -r requirements.txt && python manage.py collectstatic --no-input`
    - **Start Command:** `gunicorn config.wsgi:application`
-   - **Release Command:** `python manage.py migrate --no-input`
+   - **Pre-Deploy Command:** `python manage.py migrate --no-input` (runs before each deploy, required for DB tables)
 6. Deploy.
 
 ## Project structure
