@@ -34,7 +34,7 @@
   {% for m in meals %}
   <a href="{% url 'fitness:meal_detail' m.pk %}" class="meal-card" style="text-decoration:none;">
     {% if m.image %}
-    <img src="{{ m.image.url }}" alt="Meal photo">
+    <img src="{{ m.image }}" alt="Meal photo">
     {% else %}
     <div style="height:80px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text-muted);font-size:2rem;">🍽️</div>
     {% endif %}

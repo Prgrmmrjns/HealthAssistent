@@ -1,11 +1,11 @@
 {% extends "fitness/base.html" %}
-{% block title %}{% if template %}Edit{% else %}New{% endif %} Template — GarminClaw{% endblock %}
+{% block title %}{% if template %}Edit{% else %}New{% endif %} Template — LISA{% endblock %}
 
 {% block content %}
-<a href="{% url 'fitness:template_list' %}" style="font-size:.85rem;color:var(--text-muted)">← My Templates</a>
+<a href="{% url 'fitness:template_list' %}" style="font-size:.85rem;color:var(--text-muted)">← Templates</a>
 
 <h1 class="mt-1">{% if template %}Edit "{{ template.name }}"{% else %}New Workout Template{% endif %}</h1>
-<p class="subtitle">Build your workout step by step</p>
+<p class="subtitle">Build your workout step by step — Strength, Running, Cycling, Swimming, Yoga and more</p>
 
 {% if error %}
 <div style="background:var(--red-soft);color:var(--red);padding:.75rem 1rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.85rem">{{ error }}</div>
@@ -14,19 +14,27 @@
 <form method="post" id="template-form">
   {% csrf_token %}
 
-  <div style="display:grid;grid-template-columns:2fr 3fr;gap:1rem;margin-bottom:2rem">
+  <div style="display:grid;grid-template-columns:2fr 2fr 2fr;gap:1rem;margin-bottom:2rem">
     <div>
       <label for="name">Template Name</label>
-      <input type="text" id="name" name="name" value="{{ template.name|default:'' }}" placeholder="e.g. Pull Day, Upper Body A" required>
+      <input type="text" id="name" name="name" value="{{ template.name|default:'' }}" placeholder="e.g. Pull Day, Morning Run" required>
+    </div>
+    <div>
+      <label for="sport">Sport</label>
+      <select id="sport" name="sport">
+        {% for value, label in sport_choices %}
+        <option value="{{ value }}" {% if template and template.sport == value %}selected{% elif not template and value == 'Strength Training' %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
     </div>
     <div>
       <label for="description">Description (optional)</label>
-      <input type="text" id="description" name="description" value="{{ template.description|default:'' }}" placeholder="e.g. Back, Biceps, Rear Delts">
+      <input type="text" id="description" name="description" value="{{ template.description|default:'' }}" placeholder="e.g. Back, Biceps / 5K tempo">
     </div>
   </div>
 
   <div class="flex justify-between items-center mb-1">
-    <div class="section-title" style="margin-bottom:0">Exercises</div>
+    <div class="section-title" style="margin-bottom:0">Exercises <a href="{% url 'fitness:exercise_list' %}" style="font-size:.75rem;font-weight:400;color:var(--text-muted);margin-left:.5rem">(browse catalogue)</a></div>
     <button type="button" onclick="addRow()" class="btn btn-primary btn-sm">+ Add Exercise</button>
   </div>
 

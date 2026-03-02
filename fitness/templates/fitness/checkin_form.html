@@ -1,4 +1,5 @@
 {% extends "fitness/base.html" %}
+{% load fitness_extras %}
 {% block title %}LISA — Check-in {{ target_date }}{% endblock %}
 {% block content %}
 <h1>Daily Check-in</h1>
@@ -80,6 +81,23 @@
       <textarea id="id_exercise_desc" name="exercise_description" rows="2" placeholder="e.g. 30 min jog, 15 min yoga…">{{ checkin.exercise_description }}</textarea>
     </div>
   </div>
+  {% endif %}
+
+  <h2 class="section-title" style="margin-top:1.5rem;">Habits</h2>
+  {% if habits %}
+  <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1rem;">Mark which habits you completed today.</p>
+  <div class="form-grid cols-3" style="margin-bottom:1.5rem;">
+    {% for h in habits %}
+    {% with hid=h.id|default:h.pk log=habitlogs|get_item:hid %}
+    <div class="form-group" style="display:flex;align-items:center;gap:.5rem;">
+      <input type="checkbox" name="habit" id="habit_{{ hid }}" value="{{ hid }}" {% if log and log.completed %}checked{% endif %}>
+      <label for="habit_{{ hid }}" style="margin-bottom:0;text-transform:none;cursor:pointer;">{{ h.name }}</label>
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p style="font-size:.82rem;color:var(--text-muted);margin-bottom:1.5rem;">No habits yet. <a href="{% url 'fitness:habits_list' %}">Add habits</a> or run <code>python manage.py seed_habits</code> for default habits.</p>
   {% endif %}
 
   <h2 class="section-title" style="margin-top:1.5rem;">Notes</h2>

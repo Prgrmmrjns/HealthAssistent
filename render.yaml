@@ -1,9 +1,4 @@
-# Render Blueprint - optional. Use this if creating services from scratch,
-# or sync to apply these settings to existing services.
-
-databases:
-  - name: healthassistent-db
-    plan: free
+# Render Blueprint – uses Supabase REST API (no direct Postgres connection needed)
 
 services:
   - type: web
@@ -16,11 +11,15 @@ services:
     preDeployCommand: python manage.py migrate --no-input
 
     envVars:
-      - key: DATABASE_URL
-        fromDatabase:
-          name: healthassistent-db
-          property: connectionString
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_API_KEY
+        sync: false
       - key: GARMIN_EMAIL
         sync: false
       - key: GARMIN_PASSWORD
+        sync: false
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: MISTRAL_AI_API_KEY
         sync: false

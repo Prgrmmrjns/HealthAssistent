@@ -1,9 +1,10 @@
 """
-Fetch Garmin activities and daily stats, store locally.
+Fetch Garmin activities and daily stats, store via db abstraction layer.
 
 Usage:
-    python manage.py sync_garmin            # last 30 days
-    python manage.py sync_garmin --days 7   # last 7 days
+    python manage.py sync_garmin              # last 30 days
+    python manage.py sync_garmin --days 90    # last 90 days
+    python manage.py sync_garmin --all        # full history (from 2015)
 """
 
 from datetime import datetime, timedelta
@@ -12,7 +13,7 @@ import garminconnect
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from fitness.models import DailyStats, UserProfile, Workout, WorkoutSet
+from fitness.db import get_db
 
 GARMIN_TO_SPORT = {
     "running": "Running",
@@ -32,7 +33,16 @@ GARMIN_TO_SPORT = {
     "indoor_walking": "Walking",
     "mountaineering": "Hiking",
     "gym": "Strength Training",
+    "fitness_equipment": "Strength Training",
+    "floor_climbing": "Other",
+    "bouldering": "Other",
+    "rowing": "Other",
+    "cardio": "Other",
+    "functional_strength_training": "Strength Training",
 }
+
+# When --all is used, fetch from this date
+FULL_HISTORY_START = "2015-01-01"
 
 
 def _safe_float(v):
@@ -90,10 +100,7 @@ def _fetch_exercise_sets(garmin_client, activity_id):
             reps = int(reps)
 
         weight = s.get("weight")
-        if weight is not None:
-            weight = round(float(weight) / 1000, 1)
-        else:
-            weight = None
+        weight = round(float(weight) / 1000, 1) if weight is not None else None
 
         duration = _safe_float(s.get("duration"))
         if duration is not None:
@@ -110,16 +117,14 @@ def _fetch_exercise_sets(garmin_client, activity_id):
     return out
 
 
-def _sync_daily_stats(garmin, days, stdout):
-    """Fetch daily summary, weight, and VO2max for each day."""
+def _sync_daily_stats(garmin, days, db, stdout):
+    """Fetch daily summary, sleep, HRV, weight and VO2max for each day."""
     today = datetime.now().date()
-    created = 0
-    updated = 0
+    upserted = 0
 
     for offset in range(days):
         d = today - timedelta(days=offset)
         ds = d.strftime("%Y-%m-%d")
-
         defaults = {}
 
         try:
@@ -181,112 +186,138 @@ def _sync_daily_stats(garmin, days, stdout):
         if not any(v is not None for v in defaults.values()):
             continue
 
-        _, is_new = DailyStats.objects.update_or_create(date=d, defaults=defaults)
-        if is_new:
-            created += 1
-        else:
-            updated += 1
+        try:
+            db.upsert_daily_stats(ds, defaults)
+            upserted += 1
+        except Exception as exc:
+            stdout.write(f"  Warning: could not save stats for {ds}: {exc}")
 
-    stdout.write(f"  Daily stats: {created} created, {updated} updated.")
+    stdout.write(f"  Daily stats: {upserted} days upserted.")
+
+
+def _sync_activities(garmin, start, end, db, stdout):
+    """Fetch all activities in [start, end] and store new ones."""
+    stdout.write(f"  Fetching activities {start} → {end}…")
+
+    # Pre-load all existing garmin IDs to avoid N+1 existence checks
+    existing_ids = db.get_existing_garmin_ids()
+
+    activities = garmin.get_activities_by_date(start, end) or []
+    stdout.write(f"  Found {len(activities)} activities from Garmin.")
+
+    created_count = 0
+    sets_count = 0
+
+    for a in activities:
+        activity_id = a.get("activityId")
+        if not activity_id or activity_id in existing_ids:
+            continue
+
+        atype = a.get("activityType", {})
+        type_key = atype.get("typeKey", "other") if isinstance(atype, dict) else str(atype)
+        dur = _safe_float(a.get("duration"))
+        dist = _safe_float(a.get("distance"))
+        date_str = (a.get("startTimeLocal") or "")[:10]
+        if not date_str:
+            continue
+
+        sport = GARMIN_TO_SPORT.get(type_key, type_key.replace("_", " ").title() or "Other")
+
+        try:
+            workout = db.create_workout({
+                "garmin_activity_id": activity_id,
+                "name": a.get("activityName") or type_key.replace("_", " ").title(),
+                "date": date_str,
+                "sport": sport,
+                "duration_min": round(dur / 60, 1) if dur else None,
+                "distance_km": round(dist / 1000, 2) if dist else None,
+                "calories": _safe_float(a.get("calories")),
+                "avg_hr": _safe_float(a.get("averageHR")),
+                "max_hr": _safe_float(a.get("maxHR")),
+            })
+        except Exception as exc:
+            stdout.write(f"  Warning: could not save activity {activity_id}: {exc}")
+            continue
+
+        existing_ids.add(activity_id)
+        created_count += 1
+
+        if sport == "Strength Training" and workout:
+            workout_id = getattr(workout, "id", None) or getattr(workout, "pk", None)
+            sets_data = _fetch_exercise_sets(garmin, activity_id)
+            for s in sets_data:
+                try:
+                    db.create_workout_set({
+                        "workout_id": workout_id,
+                        "exercise": s["exercise"],
+                        "set_type": s["set_type"],
+                        "reps": s["reps"],
+                        "weight_kg": s["weight_kg"],
+                        "duration_sec": s["duration_sec"],
+                        "order": s["order"],
+                    })
+                    sets_count += 1
+                except Exception:
+                    pass
+
+    skipped = len(activities) - created_count
+    stdout.write(f"  Workouts: {created_count} new, {sets_count} sets, {skipped} already existed.")
+    return created_count
 
 
 class Command(BaseCommand):
-    help = "Sync Garmin activities + daily stats to local database"
+    help = "Sync Garmin activities + daily stats"
 
     def add_arguments(self, parser):
-        parser.add_argument("--days", type=int, default=30)
+        parser.add_argument("--days", type=int, default=30,
+                            help="Number of past days to sync (default: 30)")
+        parser.add_argument("--all", action="store_true",
+                            help=f"Sync full history from {FULL_HISTORY_START}")
 
     def handle(self, *args, **options):
+        db = get_db()
         email = settings.GARMIN_EMAIL
         password = settings.GARMIN_PASSWORD
-        profile = UserProfile.get()
+        profile = db.get_profile()
 
         if not email or not password:
             self.stdout.write(self.style.WARNING(
-                "GARMIN_EMAIL / GARMIN_PASSWORD not set — running without Garmin."
+                "GARMIN_EMAIL / GARMIN_PASSWORD not set — skipping sync."
             ))
-            profile.garmin_connected = False
-            profile.save(update_fields=["garmin_connected"])
+            db.save_profile(profile.pk, {"garmin_connected": False})
             return
 
-        self.stdout.write("Logging in to Garmin Connect...")
+        self.stdout.write("Logging in to Garmin Connect…")
         try:
             garmin = garminconnect.Garmin(email=email, password=password)
             garmin.login()
         except Exception as exc:
-            self.stderr.write(self.style.WARNING(
-                f"Garmin login failed ({exc}). Running without Garmin."
-            ))
-            profile.garmin_connected = False
-            profile.save(update_fields=["garmin_connected"])
+            self.stderr.write(self.style.WARNING(f"Garmin login failed ({exc})."))
+            db.save_profile(profile.pk, {"garmin_connected": False})
             return
 
-        profile.garmin_connected = True
-        profile.save(update_fields=["garmin_connected"])
+        db.save_profile(profile.pk, {"garmin_connected": True})
 
-        days = options["days"]
         today = datetime.now().date()
-        start = (today - timedelta(days=days)).strftime("%Y-%m-%d")
         end = today.strftime("%Y-%m-%d")
 
-        # 1. Daily stats
-        self.stdout.write(f"Syncing daily stats ({days} days)...")
-        _sync_daily_stats(garmin, days, self.stdout)
+        if options["all"]:
+            start = FULL_HISTORY_START
+            days_back = (today - datetime.strptime(FULL_HISTORY_START, "%Y-%m-%d").date()).days
+            self.stdout.write(f"Full-history sync from {start} to {end}…")
+        else:
+            days_back = options["days"]
+            start = (today - timedelta(days=days_back)).strftime("%Y-%m-%d")
+            self.stdout.write(f"Syncing last {days_back} days ({start} → {end})…")
 
-        # 2. Activities
-        self.stdout.write(f"Fetching activities ({start} to {end})...")
-        activities = garmin.get_activities_by_date(start, end) or []
-        self.stdout.write(f"  Found {len(activities)} activities.")
+        # Daily stats (only for incremental or reasonable windows)
+        if not options["all"]:
+            self.stdout.write("Syncing daily stats…")
+            _sync_daily_stats(garmin, days_back, db, self.stdout)
+        else:
+            self.stdout.write("Skipping daily stats for full-history sync (use --days for stats).")
 
-        created_count = 0
-        sets_count = 0
+        # Activities
+        _sync_activities(garmin, start, end, db, self.stdout)
 
-        for a in activities:
-            activity_id = a.get("activityId")
-            if not activity_id:
-                continue
-
-            if Workout.objects.filter(garmin_activity_id=activity_id).exists():
-                continue
-
-            atype = a.get("activityType", {})
-            type_key = atype.get("typeKey", "other") if isinstance(atype, dict) else str(atype)
-            dur = _safe_float(a.get("duration"))
-            dist = _safe_float(a.get("distance"))
-            date_str = (a.get("startTimeLocal") or "")[:10]
-            if not date_str:
-                continue
-
-            sport = GARMIN_TO_SPORT.get(type_key, "Other")
-
-            workout = Workout.objects.create(
-                garmin_activity_id=activity_id,
-                name=a.get("activityName") or type_key.replace("_", " ").title(),
-                date=date_str,
-                sport=sport,
-                duration_min=round(dur / 60, 1) if dur else None,
-                distance_km=round(dist / 1000, 2) if dist else None,
-                calories=_safe_float(a.get("calories")),
-                avg_hr=_safe_float(a.get("averageHR")),
-                max_hr=_safe_float(a.get("maxHR")),
-            )
-            created_count += 1
-
-            if sport == "Strength Training":
-                sets_data = _fetch_exercise_sets(garmin, activity_id)
-                for s in sets_data:
-                    WorkoutSet.objects.create(
-                        workout=workout,
-                        exercise=s["exercise"],
-                        set_type=s["set_type"],
-                        reps=s["reps"],
-                        weight_kg=s["weight_kg"],
-                        duration_sec=s["duration_sec"],
-                        order=s["order"],
-                    )
-                    sets_count += 1
-
-        self.stdout.write(self.style.SUCCESS(
-            f"Done. {created_count} new workouts, {sets_count} sets. "
-            f"({len(activities) - created_count} already existed.)"
-        ))
+        self.stdout.write(self.style.SUCCESS("Sync complete."))

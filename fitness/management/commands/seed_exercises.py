@@ -8,7 +8,7 @@ Usage:
 import requests
 from django.core.management.base import BaseCommand
 
-from fitness.models import Exercise
+from fitness.db import get_db
 
 GARMIN_EXERCISES_URL = "https://connect.garmin.com/web-data/exercises/Exercises.json"
 USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
@@ -20,6 +20,7 @@ class Command(BaseCommand):
     help = "Seed exercises from Garmin Connect web-data catalogue"
 
     def handle(self, *args, **options):
+        db = get_db()
         self.stdout.write("Fetching exercises from Garmin Connect...")
         r = requests.get(GARMIN_EXERCISES_URL, timeout=30, headers={"User-Agent": USER_AGENT})
         r.raise_for_status()
@@ -27,7 +28,6 @@ class Command(BaseCommand):
 
         categories = data.get("categories", {})
         created = 0
-        skipped = 0
 
         for cat_id, cat_data in categories.items():
             exercises = cat_data.get("exercises", {})
@@ -43,21 +43,14 @@ class Command(BaseCommand):
                 else:
                     ex_type = "Strength"
 
-                _, is_new = Exercise.objects.get_or_create(
-                    name=display_name,
-                    defaults={
-                        "garmin_category": cat_id,
-                        "garmin_name": ex_id,
-                        "muscle_group": muscle,
-                        "equipment": "Other",
-                        "exercise_type": ex_type,
-                    },
-                )
-                if is_new:
-                    created += 1
-                else:
-                    skipped += 1
+                db.upsert_exercise({
+                    "name": display_name,
+                    "garmin_category": cat_id,
+                    "garmin_name": ex_id,
+                    "muscle_group": muscle,
+                    "equipment": "Other",
+                    "exercise_type": ex_type,
+                })
+                created += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f"Done. {created} exercises created, {skipped} already existed."
-        ))
+        self.stdout.write(self.style.SUCCESS(f"Done. {created} exercises upserted."))

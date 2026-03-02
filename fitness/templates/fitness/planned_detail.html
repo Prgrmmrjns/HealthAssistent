@@ -1,0 +1,67 @@
+{% extends "fitness/base.html" %}
+{% block title %}{{ planned.name }} — Planner{% endblock %}
+
+{% block content %}
+<a href="{% url 'fitness:planned_list' %}" style="font-size:.85rem;color:var(--text-muted)">← Schedule</a>
+<div class="flex justify-between items-center mt-1 mb-1">
+  <div>
+    <h1 style="margin-bottom:0">{{ planned.name }}</h1>
+    <p class="subtitle">{{ planned.date|date:"l, F j, Y" }}{% if planned.time %} at {{ planned.time|time:"H:i" }}{% endif %}</p>
+    <span class="badge {% if planned.sport == 'Running' %}badge-running{% elif planned.sport == 'Cycling' %}badge-cycling{% elif planned.sport == 'Strength Training' %}badge-strength{% elif planned.sport == 'Swimming' %}badge-cycling{% else %}badge-other{% endif %}">{{ planned.sport }}</span>
+  </div>
+  <div class="flex gap-sm" style="flex-wrap:wrap;align-items:center;">
+    {% if has_garmin and not planned.garmin_synced %}
+    <form method="post" action="{% url 'fitness:planned_sync_garmin' planned.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary">↻ Sync to Garmin</button>
+    </form>
+    {% elif planned.garmin_synced %}
+    <span style="color:var(--green);font-size:.9rem;font-weight:600;">✓ Synced to Garmin</span>
+    {% endif %}
+    <a href="{% url 'fitness:planned_add' %}" class="btn btn-ghost btn-sm">+ Schedule Another</a>
+    <a href="{% url 'fitness:planned_edit' planned.pk %}" class="btn btn-ghost btn-sm">Edit</a>
+    <form method="post" action="{% url 'fitness:planned_delete' planned.pk %}" style="display:inline" onsubmit="return confirm('Delete this planned workout?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+    </form>
+  </div>
+</div>
+
+{% if planned.duration_min or planned.distance_km %}
+<div class="stat-grid mb-2" style="grid-template-columns:repeat(3, 1fr);">
+  {% if planned.duration_min %}
+  <div class="stat-card">
+    <div class="value accent">{{ planned.duration_min }}</div>
+    <div class="label">Minutes</div>
+  </div>
+  {% endif %}
+  {% if planned.distance_km %}
+  <div class="stat-card">
+    <div class="value green">{{ planned.distance_km }}</div>
+    <div class="label">Kilometers</div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if planned.description %}
+<div class="stat-card mb-2">
+  <div class="label">Description</div>
+  <div style="margin-top:.4rem;">{{ planned.description }}</div>
+</div>
+{% endif %}
+
+{% if planned.notes %}
+<div class="stat-card mb-2">
+  <div class="label">Notes</div>
+  <div style="margin-top:.4rem;color:var(--text-muted);font-size:.9rem;">{{ planned.notes }}</div>
+</div>
+{% endif %}
+
+{% if not has_garmin %}
+<div class="stat-card mt-1" style="border-color:var(--yellow);">
+  <div class="label" style="color:var(--yellow);">Garmin not connected</div>
+  <div style="font-size:.85rem;color:var(--text-muted);margin-top:.3rem;">Set GARMIN_EMAIL and GARMIN_PASSWORD in .env to sync planned workouts to Garmin Connect.</div>
+</div>
+{% endif %}
+{% endblock %}

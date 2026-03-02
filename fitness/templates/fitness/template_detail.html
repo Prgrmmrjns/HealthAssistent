@@ -1,12 +1,16 @@
 {% extends "fitness/base.html" %}
-{% block title %}{{ template.name }} — GarminClaw{% endblock %}
+{% block title %}{{ template.name }} — LISA{% endblock %}
 
 {% block content %}
-<a href="{% url 'fitness:template_list' %}" style="font-size:.85rem;color:var(--text-muted)">← My Templates</a>
+<a href="{% url 'fitness:template_list' %}" style="font-size:.85rem;color:var(--text-muted)">← Templates</a>
 
 <div class="flex justify-between items-center mt-1 mb-1">
-  <h1 style="margin-bottom:0">{{ template.name }}</h1>
+  <div>
+    <h1 style="margin-bottom:0">{{ template.name }}</h1>
+    {% if template.sport %}<span class="badge {% if template.sport == 'Running' %}badge-running{% elif template.sport == 'Cycling' %}badge-cycling{% elif template.sport == 'Strength Training' %}badge-strength{% else %}badge-other{% endif %}">{{ template.sport }}</span>{% endif %}
+  </div>
   <div class="flex gap-sm">
+    <a href="{% url 'fitness:planned_add' %}?template_id={{ template.pk }}" class="btn btn-primary btn-sm">Schedule to Garmin</a>
     <a href="{% url 'fitness:template_edit' template.pk %}" class="btn btn-ghost btn-sm">Edit</a>
     <form method="post" action="{% url 'fitness:template_delete' template.pk %}" style="display:inline" onsubmit="return confirm('Delete this template?')">
       {% csrf_token %}

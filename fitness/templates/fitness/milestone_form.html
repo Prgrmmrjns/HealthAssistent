@@ -1,0 +1,31 @@
+{% extends "fitness/base.html" %}
+{% block title %}{% if milestone %}Edit{% else %}Add{% endif %} Milestone — LISA{% endblock %}
+
+{% block content %}
+<a href="{% url 'fitness:goal_detail' goal.pk %}">← {{ goal.name }}</a>
+<h1 class="mt-1">{% if milestone %}Edit Milestone{% else %}Add Milestone{% endif %}</h1>
+
+<form method="post" class="form-grid" style="max-width:500px;">
+  {% csrf_token %}
+  <div class="form-group form-full">
+    <label for="name">Milestone Name</label>
+    <input type="text" id="name" name="name" value="{{ milestone.name|default:'' }}" placeholder="e.g. Run 3K without stopping" required>
+  </div>
+  <div class="form-group">
+    <label for="target_date">Target Date</label>
+    <input type="date" id="target_date" name="target_date" value="{% if milestone and milestone.target_date %}{{ milestone.target_date|date:'Y-m-d' }}{% endif %}">
+  </div>
+  {% if milestone %}
+  <div class="form-group">
+    <label>
+      <input type="checkbox" name="completed" value="1" {% if milestone.completed_at %}checked{% endif %}>
+      Completed
+    </label>
+  </div>
+  {% endif %}
+  <div class="form-group form-full flex gap-sm" style="margin-top:1rem;">
+    <button type="submit" class="btn btn-primary">Save</button>
+    <a href="{% url 'fitness:goal_detail' goal.pk %}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}

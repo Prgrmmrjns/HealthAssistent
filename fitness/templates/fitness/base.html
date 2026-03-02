@@ -67,7 +67,7 @@
     .btn { display: inline-flex; align-items: center; gap: .4rem; padding: .55rem 1.1rem; border-radius: var(--radius-sm); font-size: .85rem; font-weight: 600; font-family: var(--font); cursor: pointer; border: none; transition: all .15s; text-decoration: none; }
     .btn:hover { text-decoration: none; }
     .btn-primary { background: var(--accent); color: #fff; } .btn-primary:hover { background: #5558e6; }
-    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); } .btn-ghost:hover { background: var(--bg-card); color: var(--text); }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); } .btn-ghost:hover { background: var(--bg-card); color: var(--text); } .btn-ghost.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
     .btn-danger { background: var(--red-soft); color: var(--red); } .btn-danger:hover { background: var(--red); color: #fff; }
     .btn-sm { padding: .35rem .7rem; font-size: .78rem; }
 
@@ -148,16 +148,26 @@
       <ul class="nav-links">
         <li><a href="{% url 'fitness:dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="active"{% endif %}>Dashboard</a></li>
         <li><a href="{% url 'fitness:checkin_list' %}" {% if 'checkin' in request.resolver_match.url_name %}class="active"{% endif %}>Check-in</a></li>
+        <li><a href="{% url 'fitness:goals_list' %}" {% if 'goal' in request.resolver_match.url_name or 'milestone' in request.resolver_match.url_name %}class="active"{% endif %}>Goals</a></li>
+        <li><a href="{% url 'fitness:habits_list' %}" {% if 'habit' in request.resolver_match.url_name %}class="active"{% endif %}>Habits</a></li>
         <li><a href="{% url 'fitness:meal_list' %}" {% if 'meal' in request.resolver_match.url_name %}class="active"{% endif %}>Meals</a></li>
         <li><a href="{% url 'fitness:workout_list' %}" {% if 'workout' in request.resolver_match.url_name and 'template' not in request.resolver_match.url_name %}class="active"{% endif %}>Workouts</a></li>
         <li><a href="{% url 'fitness:progress' %}" {% if request.resolver_match.url_name == 'progress' %}class="active"{% endif %}>Progress</a></li>
-        <li><a href="{% url 'fitness:template_list' %}" {% if 'template' in request.resolver_match.url_name %}class="active"{% endif %}>Templates</a></li>
-        <li><a href="{% url 'fitness:exercise_list' %}" {% if request.resolver_match.url_name == 'exercise_list' %}class="active"{% endif %}>Exercises</a></li>
+        <li><a href="{% url 'fitness:planner_list' %}" {% if 'planner' in request.resolver_match.url_name or 'template' in request.resolver_match.url_name or 'planned' in request.resolver_match.url_name or request.resolver_match.url_name == 'exercise_list' %}class="active"{% endif %}>Planner</a></li>
         <li><a href="{% url 'fitness:profile' %}" {% if request.resolver_match.url_name == 'profile' %}class="active"{% endif %}>Profile</a></li>
       </ul>
     </div>
   </nav>
-  <div class="container">{% block content %}{% endblock %}</div>
+  <div class="container">
+    {% if messages %}
+    <div style="margin-bottom:1rem;">
+      {% for m in messages %}
+      <div style="padding:.6rem 1rem;border-radius:var(--radius-sm);margin-bottom:.4rem;font-size:.88rem;{% if m.tags == 'success' %}background:var(--green-soft);color:var(--green);{% else %}background:var(--yellow);color:#000;{% endif %}">{{ m }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
   <footer>LISA — Lifestyle Assistant</footer>
   {% block extra_scripts %}{% endblock %}
 </body>

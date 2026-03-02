@@ -13,7 +13,6 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 
-import dj_database_url
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,6 +28,8 @@ ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "").split() or ["*"]
 GARMIN_EMAIL = os.environ.get("GARMIN_EMAIL", "").strip().strip('"')
 GARMIN_PASSWORD = os.environ.get("GARMIN_PASSWORD", "").strip().strip('"')
 MISTRAL_AI_API_KEY = os.environ.get("MISTRAL_AI_API_KEY", "").strip().strip('"')
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip().strip('"')
+SUPABASE_API_KEY = os.environ.get("SUPABASE_API_KEY", "").strip().strip('"')
 
 
 # Application definition
@@ -74,36 +75,14 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-def _get_database_url():
-    # Explicit env var (set manually or by Render Blueprint)
-    url = (
-        os.environ.get("DATABASE_URL")
-        or os.environ.get("DATABASE_INTERNAL_URL")
-        or os.environ.get("MY_DATA_DATABASE_URL")  # Render "my data" linked database
-    )
-    if url:
-        return url.strip().strip('"')
-    # Fallback: any env var ending with _DATABASE_URL that looks like postgres
-    for key, value in os.environ.items():
-        if key.endswith("_DATABASE_URL") and value and (
-            value.startswith("postgres://") or value.startswith("postgresql://")
-        ):
-            return value.strip().strip('"')
-    return None
-
-_db_url = _get_database_url()
-if _db_url:
-    DATABASES = {"default": dj_database_url.parse(_db_url, conn_max_age=600)}
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
+# Database — always SQLite for Django system tables (auth, sessions, admin).
+# All fitness data is accessed via the Supabase REST API (fitness/db.py).
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
+}
 
 
 # Password validation

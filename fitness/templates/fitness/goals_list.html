@@ -1,0 +1,36 @@
+{% extends "fitness/base.html" %}
+{% block title %}Goals & Milestones — LISA{% endblock %}
+
+{% block content %}
+<h1>Goals & Milestones</h1>
+<p class="subtitle">Track your goals and celebrate milestones</p>
+
+<div class="flex justify-between items-center mb-2">
+  <div class="filter-bar">
+    <a href="{% url 'fitness:goals_list' %}" class="btn btn-ghost btn-sm {% if not current_status %}active{% endif %}">All</a>
+    <a href="{% url 'fitness:goals_list' %}?status=active" class="btn btn-ghost btn-sm {% if current_status == 'active' %}active{% endif %}">Active</a>
+    <a href="{% url 'fitness:goals_list' %}?status=completed" class="btn btn-ghost btn-sm {% if current_status == 'completed' %}active{% endif %}">Completed</a>
+  </div>
+  <a href="{% url 'fitness:goal_add' %}" class="btn btn-primary">+ New Goal</a>
+</div>
+
+{% if goals %}
+<div class="template-grid">
+  {% for g in goals %}
+  <a href="{% url 'fitness:goal_detail' g.pk %}" class="template-card" style="color:var(--text)">
+    <h3>{{ g.name }}</h3>
+    <div class="meta">
+      <span class="badge {% if g.status == 'active' %}badge-running{% elif g.status == 'completed' %}badge-active{% else %}badge-other{% endif %}">{{ g.status|default:'active' }}</span>
+      {% if g.target_date %}{{ g.target_date|date:"M j, Y" }}{% endif %}
+    </div>
+    {% if g.description %}<div class="desc">{{ g.description }}</div>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty">
+  <p>No goals yet. Create your first goal!</p>
+  <a href="{% url 'fitness:goal_add' %}" class="btn btn-primary mt-1">+ New Goal</a>
+</div>
+{% endif %}
+{% endblock %}

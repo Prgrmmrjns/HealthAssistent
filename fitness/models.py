@@ -92,9 +92,23 @@ class DailyStats(models.Model):
         return f"Stats {self.date}"
 
 
+# Sport types for Planner (matches Garmin activity types)
+SPORT_CHOICES = [
+    ("Strength Training", "Strength Training"),
+    ("Running", "Running"),
+    ("Cycling", "Cycling"),
+    ("Swimming", "Swimming"),
+    ("Walking", "Walking"),
+    ("Hiking", "Hiking"),
+    ("Yoga", "Yoga"),
+    ("Other", "Other"),
+]
+
+
 class WorkoutTemplate(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField(blank=True, default="")
+    sport = models.CharField(max_length=50, choices=SPORT_CHOICES, default="Strength Training")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -111,6 +125,30 @@ class WorkoutTemplate(models.Model):
     @property
     def total_sets(self):
         return sum(e.sets for e in self.exercises.all())
+
+
+class PlannedWorkout(models.Model):
+    """Scheduled workout for a specific date and time (synced to Garmin when possible)."""
+    date = models.DateField(db_index=True)
+    time = models.TimeField(null=True, blank=True, help_text="Optional scheduled time")
+    sport = models.CharField(max_length=50, choices=SPORT_CHOICES)
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    duration_min = models.IntegerField(null=True, blank=True, help_text="Planned duration in minutes")
+    distance_km = models.FloatField(null=True, blank=True, help_text="Planned distance (e.g. for Running)")
+    template = models.ForeignKey(
+        WorkoutTemplate, on_delete=models.SET_NULL, null=True, blank=True, related_name="planned"
+    )
+    garmin_synced = models.BooleanField(default=False)
+    garmin_workout_id = models.CharField(max_length=100, blank=True, default="")
+    notes = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["date", "time", "created_at"]
+
+    def __str__(self):
+        return f"{self.name} — {self.date}"
 
 
 class TemplateExercise(models.Model):
@@ -159,7 +197,7 @@ class UserProfile(models.Model):
     activity_level = models.CharField(max_length=20, choices=ACTIVITY_CHOICES, blank=True, default="")
     health_conditions = models.TextField(blank=True, default="", help_text="Allergies, chronic conditions, medications, etc.")
     goals = models.TextField(blank=True, default="", help_text="Weight loss, muscle gain, better sleep, etc.")
-    profile_image = models.ImageField(upload_to="profile/", blank=True, null=True)
+    profile_image = models.CharField(max_length=500, blank=True, default="")
     garmin_connected = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -212,7 +250,7 @@ class Meal(models.Model):
     date = models.DateField(db_index=True)
     meal_type = models.CharField(max_length=20, choices=MEAL_TYPE_CHOICES)
     description = models.TextField(blank=True, default="")
-    image = models.ImageField(upload_to="meals/%Y/%m/", blank=True, null=True)
+    image = models.CharField(max_length=500, blank=True, default="")
     # AI-estimated macros
     calories_est = models.IntegerField(null=True, blank=True)
     protein_g = models.FloatField(null=True, blank=True)
@@ -227,3 +265,70 @@ class Meal(models.Model):
 
     def __str__(self):
         return f"{self.get_meal_type_display()} — {self.date}"
+
+
+# ---------------------------------------------------------------------------
+# Goals, Milestones, Habits
+# ---------------------------------------------------------------------------
+
+GOAL_STATUS_CHOICES = [
+    ("active", "Active"),
+    ("completed", "Completed"),
+    ("archived", "Archived"),
+]
+
+
+class Goal(models.Model):
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    target_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=GOAL_STATUS_CHOICES, default="active")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return self.name
+
+
+class Milestone(models.Model):
+    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="milestones")
+    name = models.CharField(max_length=200)
+    target_date = models.DateField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["target_date", "created_at"]
+
+    def __str__(self):
+        return self.name
+
+
+class Habit(models.Model):
+    name = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    is_suggested = models.BooleanField(default=False, help_text="Pre-defined suggested habit")
+    order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class HabitLog(models.Model):
+    habit = models.ForeignKey(Habit, on_delete=models.CASCADE, related_name="logs")
+    date = models.DateField(db_index=True)
+    completed = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-date"]
+        unique_together = [("habit", "date")]
+
+    def __str__(self):
+        return f"{self.habit.name} — {self.date}"

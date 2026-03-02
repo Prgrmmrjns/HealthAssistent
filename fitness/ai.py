@@ -54,17 +54,35 @@ def _parse_ai_response(text):
         return None
 
 
-def analyze_food_image(image_path):
-    """Send a food image to Mistral Pixtral and get macronutrient estimates."""
+def analyze_food_image(image_source, mime_hint="image/jpeg"):
+    """
+    Send a food image to Mistral Pixtral and get macronutrient estimates.
+
+    image_source can be:
+    - bytes  — raw image bytes (analysed directly, no network fetch needed)
+    - str URL (http/https) — fetched and base64-encoded
+    - str path — local file read and base64-encoded
+    """
     api_key = settings.MISTRAL_AI_API_KEY
     if not api_key:
         return {"error": "MISTRAL_AI_API_KEY not set"}
 
-    with open(image_path, "rb") as f:
-        img_b64 = base64.b64encode(f.read()).decode("utf-8")
-
-    ext = str(image_path).rsplit(".", 1)[-1].lower()
-    mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
+    if isinstance(image_source, (bytes, bytearray)):
+        img_b64 = base64.b64encode(image_source).decode("utf-8")
+        mime = mime_hint
+    else:
+        image_source = str(image_source)
+        if image_source.startswith("http://") or image_source.startswith("https://"):
+            r = requests.get(image_source, timeout=30)
+            r.raise_for_status()
+            img_b64 = base64.b64encode(r.content).decode("utf-8")
+            ct = r.headers.get("content-type", "image/jpeg").split(";")[0]
+            mime = ct if ct.startswith("image/") else "image/jpeg"
+        else:
+            with open(image_source, "rb") as f:
+                img_b64 = base64.b64encode(f.read()).decode("utf-8")
+            ext = image_source.rsplit(".", 1)[-1].lower()
+            mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
 
     payload = {
         "model": "pixtral-12b-2409",

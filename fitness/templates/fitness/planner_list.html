@@ -1,0 +1,31 @@
+{% extends "fitness/base.html" %}
+{% block title %}Planner — LISA{% endblock %}
+
+{% block content %}
+<h1>Planner</h1>
+<p class="subtitle">Create workouts, schedule sessions, and sync to Garmin Connect</p>
+
+<div class="stat-grid" style="grid-template-columns:repeat(auto-fill, minmax(260px, 1fr));">
+  <a href="{% url 'fitness:template_list' %}" class="stat-card" style="text-decoration:none;color:inherit;display:block;">
+    <div class="value accent">Templates</div>
+    <div class="label">Build workout templates with exercises, sets, reps, and rest</div>
+  </a>
+  <a href="{% url 'fitness:exercise_list' %}" class="stat-card" style="text-decoration:none;color:inherit;display:block;">
+    <div class="value green">Exercises</div>
+    <div class="label">Browse {{ total_exercises|default:"1000+" }} exercises from the Garmin catalogue</div>
+  </a>
+  <a href="{% url 'fitness:planned_list' %}" class="stat-card" style="text-decoration:none;color:inherit;display:block;">
+    <div class="value blue">Schedule</div>
+    <div class="label">Plan workouts for dates and times · Sync to Garmin</div>
+  </a>
+</div>
+
+<h2 class="section-title mt-2">Quick actions</h2>
+<div class="flex gap-sm" style="flex-wrap:wrap;">
+  <a href="{% url 'fitness:planned_add' %}" class="btn btn-primary">+ Schedule Workout</a>
+  <a href="{% url 'fitness:template_create' %}" class="btn btn-ghost">+ New Template</a>
+  <a href="{% url 'fitness:template_list' %}" class="btn btn-ghost">My Templates</a>
+  <a href="{% url 'fitness:planned_list' %}" class="btn btn-ghost">View Schedule</a>
+  <a href="{% url 'fitness:exercise_list' %}" class="btn btn-ghost">Browse Exercises</a>
+</div>
+{% endblock %}

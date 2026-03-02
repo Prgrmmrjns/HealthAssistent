@@ -36,10 +36,16 @@ Edit `.env`:
 |----------|----------|-------------|
 | `GARMIN_EMAIL` | Yes | Your Garmin Connect email |
 | `GARMIN_PASSWORD` | Yes | Your Garmin Connect password |
-| `DJANGO_SECRET_KEY` | For production | Secret key for Django (defaults to dev value if unset) |
+| `SUPABASE_DB_URL` | For Supabase | Postgres connection string from [Supabase](https://supabase.com) (Project Settings → Database → URI) |
+| `DJANGO_SECRET_KEY` | For production | Secret key (defaults to dev value if unset) |
 | `MISTRAL_AI_API_KEY` | No | For AI meal analysis ([get key](https://console.mistral.ai/)) |
 
-### 3. Database and run
+### 3. Database (Supabase)
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. Go to **Project Settings** → **Database** → copy the **Connection string** (URI, Session mode).
+3. Add `SUPABASE_DB_URL` to `.env` with that URI.
+4. Run migrations to create tables:
 
 ```bash
 python manage.py migrate
@@ -47,6 +53,8 @@ python manage.py createsuperuser
 python manage.py sync_garmin --days 30
 python manage.py runserver
 ```
+
+This creates: `fitness_dailystats`, `fitness_workout`, `fitness_workoutset`, `fitness_dailycheckin`, `fitness_meal`, `fitness_exercise`, `fitness_workouttemplate`, `fitness_templateexercise`, `fitness_userprofile`.
 
 Open http://127.0.0.1:8000 and log in. The fitness dashboard is at `/fitness/`.
 
@@ -59,17 +67,15 @@ Open http://127.0.0.1:8000 and log in. The fitness dashboard is at `/fitness/`.
 
 ## Deploy on Render
 
-1. Create a **PostgreSQL** database in the Render dashboard.
-2. Create a **Web Service** and connect your repo.
-3. Link the PostgreSQL database to the web service, **or** add `DATABASE_URL` manually:
-   - Open your PostgreSQL service → **Connect** → copy **Internal Database URL**
-   - In the Web Service → **Environment** → add variable: `DATABASE_URL` = that URL
-4. Add environment variables: `GARMIN_EMAIL`, `GARMIN_PASSWORD`, and optionally `DJANGO_SECRET_KEY`, `MISTRAL_AI_API_KEY`.
-5. Set these in the Render dashboard:
+1. Create a **Web Service** and connect your repo.
+2. Use **Supabase** as the database (no Render Postgres):
+   - In Render → Web Service → **Environment**, add `SUPABASE_DB_URL` = your Supabase connection string (Project Settings → Database → URI).
+3. Add: `GARMIN_EMAIL`, `GARMIN_PASSWORD`, and optionally `DJANGO_SECRET_KEY`, `MISTRAL_AI_API_KEY`.
+4. Configure:
    - **Build Command:** `pip install -r requirements.txt && python manage.py collectstatic --no-input`
    - **Start Command:** `gunicorn config.wsgi:application`
-   - **Pre-Deploy Command:** `python manage.py migrate --no-input` (runs before each deploy, required for DB tables)
-6. Deploy.
+   - **Pre-Deploy Command:** `python manage.py migrate --no-input`
+5. Deploy.
 
 ## Project structure
 

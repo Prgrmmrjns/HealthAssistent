@@ -1,9 +1,10 @@
 {% extends "fitness/base.html" %}
-{% block title %}Exercises — GarminClaw{% endblock %}
+{% block title %}Exercises — Planner{% endblock %}
 
 {% block content %}
-<h1>Exercises</h1>
-<p class="subtitle">{{ total }} exercises from the Garmin catalogue</p>
+<a href="{% url 'fitness:planner_list' %}" style="font-size:.85rem;color:var(--text-muted)">← Planner</a>
+<h1 class="mt-1">Exercises</h1>
+<p class="subtitle">{{ total }} exercises from the Garmin catalogue — use when building templates</p>
 
 <form class="filter-bar" method="get">
   <input type="search" name="q" placeholder="Search exercises..." value="{{ q }}" style="min-width:200px">

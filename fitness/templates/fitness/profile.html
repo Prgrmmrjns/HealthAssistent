@@ -10,7 +10,7 @@
   <!-- Avatar -->
   <div class="profile-header">
     {% if profile.profile_image %}
-    <img src="{{ profile.profile_image.url }}" alt="Profile" class="profile-avatar">
+    <img src="{{ profile.profile_image }}" alt="Profile" class="profile-avatar">
     {% else %}
     <div class="profile-avatar-placeholder">👤</div>
     {% endif %}
@@ -86,13 +86,33 @@
 
 {% if profile.garmin_connected %}
 <div class="stat-card mt-1" style="border-color:var(--green);">
-  <div class="value green" style="font-size:1rem;">✓ Garmin Connected</div>
-  <div class="label">Data is synced from your Garmin account</div>
+  <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:.75rem;">
+    <div>
+      <div class="value green" style="font-size:1rem;">✓ Garmin Connected</div>
+      <div class="label" style="margin-top:.2rem;">
+        Auto-sync runs every hour (rate-limited).
+        {% if last_sync %}Last sync: {{ last_sync|date:"H:i" }}.{% else %}First sync runs shortly after startup.{% endif %}
+      </div>
+    </div>
+    <div class="flex gap-sm" style="flex-wrap:wrap;">
+      <form method="post" action="{% url 'fitness:sync_now' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'fitness:profile' %}">
+        <button type="submit" class="btn btn-primary btn-sm">↻ Sync (30 days)</button>
+      </form>
+      <form method="post" action="{% url 'fitness:sync_now' %}">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{% url 'fitness:profile' %}">
+        <input type="hidden" name="full" value="1">
+        <button type="submit" class="btn btn-ghost btn-sm">↻ Full History</button>
+      </form>
+    </div>
+  </div>
 </div>
 {% else %}
 <div class="stat-card mt-1" style="border-color:var(--yellow);">
   <div class="value" style="font-size:1rem;color:var(--yellow);">⚡ No Garmin</div>
-  <div class="label">LISA will ask extra questions about your activity in daily check-ins</div>
+  <div class="label">Set GARMIN_EMAIL and GARMIN_PASSWORD in your <code>.env</code> to enable automatic sync.</div>
 </div>
 {% endif %}
 {% endblock %}

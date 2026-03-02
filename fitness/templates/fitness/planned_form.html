@@ -1,0 +1,65 @@
+{% extends "fitness/base.html" %}
+{% block title %}{% if planned %}Edit{% else %}Schedule{% endif %} Workout — Planner{% endblock %}
+
+{% block content %}
+<a href="{% url 'fitness:planned_list' %}" style="font-size:.85rem;color:var(--text-muted)">← Schedule</a>
+<h1 class="mt-1">{% if planned %}Edit "{{ planned.name }}"{% else %}Schedule Workout{% endif %}</h1>
+<p class="subtitle">Set date, time, and details — then sync to Garmin Connect. Use a template or create ad-hoc.</p>
+
+{% if error %}
+<div style="background:var(--red-soft);color:var(--red);padding:.75rem 1rem;border-radius:var(--radius-sm);margin-bottom:1rem;font-size:.85rem">{{ error }}</div>
+{% endif %}
+
+<form method="post" class="form-grid cols-3" style="max-width:600px;">
+  {% csrf_token %}
+  <div class="form-group">
+    <label for="date">Date</label>
+    <input type="date" id="date" name="date" value="{% if planned %}{{ planned.date|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" required>
+  </div>
+  <div class="form-group">
+    <label for="time">Time (optional)</label>
+    <input type="time" id="time" name="time" value="{% if planned and planned.time %}{{ planned.time|time:'H:i' }}{% endif %}">
+  </div>
+  <div class="form-group">
+    <label for="sport">Sport</label>
+    <select id="sport" name="sport">
+      {% for value, label in sport_choices %}
+      <option value="{{ value }}" {% if planned and planned.sport == value %}selected{% elif initial.sport == value %}selected{% elif not planned and value == 'Strength Training' %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-group form-full">
+    <label for="name">Workout Name</label>
+    <input type="text" id="name" name="name" value="{{ planned.name|default:initial.name|default:'' }}" placeholder="e.g. Morning Run, Push Day" required>
+  </div>
+  <div class="form-group">
+    <label for="duration_min">Duration (min)</label>
+    <input type="number" id="duration_min" name="duration_min" value="{{ planned.duration_min|default:'' }}" min="1" step="5" placeholder="Optional">
+  </div>
+  <div class="form-group">
+    <label for="distance_km">Distance (km)</label>
+    <input type="number" id="distance_km" name="distance_km" value="{{ planned.distance_km|default:'' }}" min="0" step="0.1" placeholder="e.g. 5">
+  </div>
+  <div class="form-group form-full">
+    <label for="template_id">Based on Template (optional)</label>
+    <select id="template_id" name="template_id">
+      <option value="">—</option>
+      {% for t in templates %}
+      <option value="{{ t.id }}" {% if planned and planned.template_id == t.id %}selected{% elif planned and planned.template and planned.template.id == t.id %}selected{% elif pre_selected_template_id == t.id %}selected{% endif %}>{{ t.name }} ({{ t.sport|default:'Strength' }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-group form-full">
+    <label for="description">Description / Notes</label>
+    <textarea id="description" name="description" rows="2" placeholder="Optional">{{ planned.description|default:initial.description|default:'' }}</textarea>
+  </div>
+  <div class="form-group form-full">
+    <label for="notes">Additional Notes</label>
+    <input type="text" id="notes" name="notes" value="{{ planned.notes|default:'' }}" placeholder="Optional">
+  </div>
+  <div class="form-group form-full flex gap-sm" style="margin-top:1rem;">
+    <button type="submit" class="btn btn-primary">{% if planned %}Save Changes{% else %}Schedule Workout{% endif %}</button>
+    <a href="{% url 'fitness:planned_list' %}" class="btn btn-ghost">Cancel</a>
+  </div>
+</form>
+{% endblock %}
