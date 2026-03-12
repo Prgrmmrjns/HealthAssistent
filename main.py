@@ -47,9 +47,12 @@ def seconds_until_next_hour() -> float:
 
 
 if __name__ == "__main__":
+    main()
+    if os.environ.get("RUN_ONCE", "").strip().lower() in ("1", "true", "yes", "on"):
+        exit(0)
     while True:
-        main()
         secs = seconds_until_next_hour()
         next_run = datetime.now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
         print(f"Next run at {next_run.strftime('%H:%M')} (sleeping {int(secs)}s)")
         time.sleep(secs)
+        main()

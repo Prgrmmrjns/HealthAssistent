@@ -18,14 +18,17 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: |
-          pip install -r garmin_notion_sync/requirements.txt
+        run: pip install -r requirements.txt
 
-      - name: Sync Garmin daily metrics to Notion
+      - name: Run sync (Garmin + optional Meals)
         env:
           GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
           GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
-          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
+          RUN_ONCE: "1"
+          RUN_MEAL_ANALYSIS: ${{ secrets.RUN_MEAL_ANALYSIS }}
+          MISTRAL_AI_API_KEY: ${{ secrets.MISTRAL_AI_API_KEY }}
+          MISTRAL_MODEL: ${{ secrets.MISTRAL_MODEL }}
           SYNC_DAYS: "7"
-        run: python garmin_notion_sync/sync_daily_metrics.py
+        run: python main.py

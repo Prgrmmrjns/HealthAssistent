@@ -179,20 +179,31 @@ When `main.py` creates the databases, they get these properties. **Garmin Daily*
 
 ---
 
-## 6. GitHub Actions (optional)
+## 6. Deploy with GitHub Actions
 
-To run the sync on a schedule (e.g. daily):
+The workflow runs **once per day** at 06:00 UTC (and you can trigger it manually). Each run ensures DBs exist, syncs Garmin, and optionally runs Meals analysis.
 
-1. In your repo: **Settings → Secrets and variables → Actions**, add:
-   - `GARMIN_EMAIL`
-   - `GARMIN_PASSWORD`
-   - `NOTION_API_KEY`
-   - `NOTION_PAGE_ID`
-   - `RUN_MEAL_ANALYSIS` (optional; set to `True` if you want Meals in the workflow)
-   - `MISTRAL_AI_API_KEY` (only if `RUN_MEAL_ANALYSIS=True`)
-2. Update `.github/workflows/sync-garmin-notion.yml` so it:
-   - Uses `NOTION_PAGE_ID` instead of `NOTION_DATABASE_ID`.
-   - Runs `python main.py` (or `python sync_garmin.py` if you only want Garmin) from the repo root with `pip install -r requirements.txt` in the same repo.
+### 6.1 Add repository secrets
+
+1. In your GitHub repo go to **Settings → Secrets and variables → Actions**.
+2. Click **New repository secret** and add:
+
+   | Secret | Required | Value |
+   |--------|----------|--------|
+   | `GARMIN_EMAIL` | Yes | Your Garmin Connect email |
+   | `GARMIN_PASSWORD` | Yes | Your Garmin Connect password |
+   | `NOTION_API_KEY` | Yes | Notion integration secret (from step 1.1) |
+   | `NOTION_PAGE_ID` | Yes | Page ID where the DBs live (from step 1.2) |
+   | `RUN_MEAL_ANALYSIS` | No | `True` to enable Meals in the workflow; omit or `False` for Garmin only |
+   | `MISTRAL_AI_API_KEY` | If Meals | Mistral API key (only if `RUN_MEAL_ANALYSIS=True`) |
+   | `MISTRAL_MODEL` | No | e.g. `pixtral-12b-2409` (optional; default is used if unset) |
+
+3. Push the repo (the workflow file is already in `.github/workflows/sync-garmin-notion.yml`). The workflow uses `RUN_ONCE=1` so it runs `main.py` once and exits (no hourly loop).
+
+### 6.2 Run the workflow
+
+- **Automatic:** runs daily at 06:00 UTC.
+- **Manual:** **Actions** tab → **Sync Garmin to Notion** → **Run workflow**.
 
 Garmin Connect login does not support 2FA for this type of access; use an app password or a dedicated account if your main account has 2FA.
 
