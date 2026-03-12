@@ -9,7 +9,7 @@ Edit these values to change behavior without touching code:
 RUN_MEAL_ANALYSIS: bool = True
 
 # Mistral model to use for analyzing meal images.
-model: str = "mistral-large-2512"
+model: str = "pixtral-12b-2409"
 
 # Minutes between sync runs when running main.py as a daemon (ignored if RUN_ONCE=1).
 SYNC_INTERVAL_MINUTES: int = 5
