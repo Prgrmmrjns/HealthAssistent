@@ -14,6 +14,7 @@ import requests
 from dotenv import load_dotenv
 
 from notion_db import _headers, get_database_property_names, get_meals_db_id
+from params import model
 
 load_dotenv()
 
@@ -105,10 +106,10 @@ def fetch_image_as_base64(url: str, notion_api_key: str) -> tuple[str, str] | No
         return None
 
 
-def analyze_food_image(image_b64: str, mime: str, mistral_key: str, model: str | None = None) -> dict | None:
-    model = (model or os.environ.get("MISTRAL_MODEL", "").strip()) or "pixtral-12b-2409"
+def analyze_food_image(image_b64: str, mime: str, mistral_key: str, model_name: str | None = None) -> dict | None:
+    model_name = (model_name or model or "").strip() or "pixtral-12b-2409"
     payload = {
-        "model": model,
+        "model": model_name,
         "messages": [
             {
                 "role": "user",

@@ -27,8 +27,5 @@ jobs:
           NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
           NOTION_PAGE_ID: ${{ secrets.NOTION_PAGE_ID }}
           RUN_ONCE: "1"
-          RUN_MEAL_ANALYSIS: ${{ secrets.RUN_MEAL_ANALYSIS }}
           MISTRAL_AI_API_KEY: ${{ secrets.MISTRAL_AI_API_KEY }}
-          MISTRAL_MODEL: ${{ secrets.MISTRAL_MODEL }}
-          SYNC_DAYS: "7"
         run: python main.py

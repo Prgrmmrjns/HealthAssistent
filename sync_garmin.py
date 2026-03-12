@@ -13,8 +13,6 @@ from notion_db import GARMIN_NUMBER_KEYS, _headers, get_garmin_db_id
 
 load_dotenv()
 
-DEFAULT_DAYS = 30
-
 
 def fetch_daily_stats(garmin, date_str: str) -> dict:
     def num(v, cast=int):
@@ -97,7 +95,6 @@ def main():
     password = os.environ.get("GARMIN_PASSWORD", "").strip()
     notion_key = os.environ.get("NOTION_API_KEY", "").strip()
     page_id = os.environ.get("NOTION_PAGE_ID", "").strip()
-    days = int(os.environ.get("SYNC_DAYS", str(DEFAULT_DAYS)))
 
     database_id = get_garmin_db_id(notion_key, page_id)
     if not database_id:
@@ -115,24 +112,21 @@ def main():
     garmin = garminconnect.Garmin(email=email, password=password)
     garmin.login()
 
+    # Only sync today's date; no historical backfill here.
     today = datetime.now().date()
-    created = updated = 0
-    for offset in range(days):
-        d = today - timedelta(days=offset)
-        ds = d.strftime("%Y-%m-%d")
-        stats = fetch_daily_stats(garmin, ds)
-        if not any(v is not None for v in stats.values()):
-            continue
-        page_id_res = _query_page_by_date(notion_key, database_id, ds)
-        if page_id_res:
-            _update_page(notion_key, page_id_res, stats)
-            updated += 1
-            print(f"  Updated {ds}")
-        else:
-            _create_page(notion_key, database_id, ds, stats)
-            created += 1
-            print(f"  Created {ds}")
-    print(f"Done. Created {created}, updated {updated}.")
+    ds = today.strftime("%Y-%m-%d")
+    stats = fetch_daily_stats(garmin, ds)
+    if not any(v is not None for v in stats.values()):
+        print(f"No data for {ds}, nothing to write.")
+        return
+
+    page_id_res = _query_page_by_date(notion_key, database_id, ds)
+    if page_id_res:
+        _update_page(notion_key, page_id_res, stats)
+        print(f"Updated {ds}")
+    else:
+        _create_page(notion_key, database_id, ds, stats)
+        print(f"Created {ds}")
 
 
 if __name__ == "__main__":

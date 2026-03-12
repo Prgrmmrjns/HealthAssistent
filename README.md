@@ -1,6 +1,6 @@
 # Garmin + Meals → Notion
 
-Sync Garmin Connect daily metrics into a Notion database. Optionally analyze meal photos with Mistral AI (name, macros, kcals, meal components). **Modular:** you can run **Garmin-only** (no Meals, no LLM cost, works on Notion Free) by setting `RUN_MEAL_ANALYSIS=False` in `.env`.
+Sync Garmin Connect daily metrics into a Notion database. Optionally analyze meal photos with Mistral AI (name, macros, kcals, meal components). **Modular:** you can run **Garmin-only** (no Meals, no LLM cost, works on Notion Free) or enable Meals via `params.py`.
 
 - **Garmin sync** – Always runs. One database **📊 Garmin Daily** is created under your Notion page; one row per day.
 - **Meals analysis** – Only if `RUN_MEAL_ANALYSIS=True`. Creates **🍽️ Meals** DB and uses Mistral to analyze meal images. Requires a **Notion Plus / Education Plus** plan (image uploads) and a **Mistral API key** (paid usage).
@@ -34,7 +34,7 @@ Sync Garmin Connect daily metrics into a Notion database. Optionally analyze mea
 3. Find your integration (e.g. “Garmin Meals Sync”) and select it.
 4. Confirm. The integration can now create and edit databases and pages under this page.
 
-You do **not** create the databases yourself. The script creates **📊 Garmin Daily** (and optionally **🍽️ Meals** when `RUN_MEAL_ANALYSIS=True`) under this page when you run it, only if they don’t already exist.
+You do **not** create the databases yourself. The script creates **📊 Garmin Daily** (and optionally **🍽️ Meals** when meal analysis is enabled in `params.py`) under this page when you run it, only if they don’t already exist.
 
 ---
 
@@ -48,13 +48,9 @@ Copy `.env.example` to `.env` and fill in:
 | `GARMIN_PASSWORD` | Yes (for Garmin sync) | Garmin Connect password |
 | `NOTION_API_KEY` | Yes | Notion integration secret (from step 1.1) |
 | `NOTION_PAGE_ID` | Yes | Page ID where DBs live (from step 1.2) |
-| `RUN_MEAL_ANALYSIS` | No | `True` to enable Meals DB + Mistral meal analysis; `False` or unset = Garmin only (default: `False`) |
-| `MISTRAL_AI_API_KEY` | Yes (if Meals) | Mistral API key for meal image analysis (only needed when `RUN_MEAL_ANALYSIS=True`) |
-| `MISTRAL_MODEL` | No | Mistral model for image analysis (default: `pixtral-12b-2409`) |
-| `SYNC_INTERVAL_MINUTES` | No | Minutes between sync runs when running as daemon (default: 60). Ignored if `RUN_ONCE=1`. |
-| `SYNC_DAYS` | No | Days of Garmin history to sync (default: 30) |
+| `MISTRAL_AI_API_KEY` | Yes (if Meals) | Mistral API key for meal image analysis (only needed when Meals are enabled in `params.py`) |
 
-**Garmin-only (no Meals):** set `RUN_MEAL_ANALYSIS=False` or leave it out. No Mistral key or Notion Plus needed.
+**Garmin-only (no Meals):** leave `MISTRAL_AI_API_KEY` empty and keep `RUN_MEAL_ANALYSIS=False` in `params.py`. No Mistral key or Notion Plus needed.
 
 Example `.env` (Garmin + Meals):
 
@@ -63,11 +59,7 @@ GARMIN_EMAIL=you@example.com
 GARMIN_PASSWORD=your_password
 NOTION_API_KEY=ntn_xxxxxxxxxxxx
 NOTION_PAGE_ID=31b4205a2f858092bdccf95ffd3212f3
-RUN_MEAL_ANALYSIS=True
 MISTRAL_AI_API_KEY=your_mistral_key
-# MISTRAL_MODEL=pixtral-12b-2409
-# SYNC_INTERVAL_MINUTES=60
-# SYNC_DAYS=30
 ```
 
 Example `.env` (Garmin only, no LLM cost):
@@ -77,20 +69,17 @@ GARMIN_EMAIL=you@example.com
 GARMIN_PASSWORD=your_password
 NOTION_API_KEY=ntn_xxxxxxxxxxxx
 NOTION_PAGE_ID=31b4205a2f858092bdccf95ffd3212f3
-RUN_MEAL_ANALYSIS=False
-# SYNC_INTERVAL_MINUTES=60
-# SYNC_DAYS=30
 ```
 
 ---
 
-## 2b. Mistral account and API budget (only if RUN_MEAL_ANALYSIS=True)
+## 2b. Mistral account and API budget (only if Meals are enabled)
 
 1. Go to [Mistral AI](https://mistral.ai/) and sign up / log in.
 2. Open [Console](https://console.mistral.ai/) → **API Keys** and create an API key. Copy it into `.env` as `MISTRAL_AI_API_KEY`.
 3. Set a **usage budget** so you don’t overspend:
    - In the Mistral console, go to **Billing** or **Usage** and set a monthly budget or alert (e.g. €5 or $5). Meal image analysis uses the Pixtral model; cost depends on how many images you analyze per run and how often you run.
-4. If you leave `RUN_MEAL_ANALYSIS=False`, you never call Mistral and incur no LLM cost.
+4. If you leave `MISTRAL_AI_API_KEY` empty and `RUN_MEAL_ANALYSIS=False` in `params.py`, you never call Mistral and incur no LLM cost.
 
 ---
 
@@ -100,6 +89,7 @@ RUN_MEAL_ANALYSIS=False
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your values (see above)
+# Edit params.py to toggle Meals, choose model, and set sync interval
 ```
 
 ### Recommended: run everything (daemon, every full hour)
@@ -111,10 +101,10 @@ python main.py
 This script:
 
 1. **Runs immediately once**:
-   - Ensures databases exist – creates **📊 Garmin Daily** (and **🍽️ Meals** only if `RUN_MEAL_ANALYSIS=True`) under your Notion page, only if they don’t already exist.
+   - Ensures databases exist – creates **📊 Garmin Daily** (and **🍽️ Meals** only if `RUN_MEAL_ANALYSIS` in `params.py` is `True`) under your Notion page, only if they don’t already exist.
    - Syncs Garmin – logs into Garmin Connect and creates/updates one row per day in Garmin Daily.
-   - If `RUN_MEAL_ANALYSIS=True`: analyzes Meals – finds rows with **Image** but empty **Intake**, sends the image to Mistral, and fills Intake, macros, kcals, and Meal components. If `False`, this step is skipped.
-2. **Then repeats every `SYNC_INTERVAL_MINUTES`** (default 60). It sleeps that long between runs until you stop it (Ctrl+C).
+   - If `RUN_MEAL_ANALYSIS` in `params.py` is `True`: analyzes Meals – finds rows with **Image** but empty **Intake**, sends the image to Mistral, and fills Intake, macros, kcals, and Meal components. If `False`, this step is skipped.
+2. **Then repeats every `SYNC_INTERVAL_MINUTES` from `params.py`** (default 60). It sleeps that long between runs until you stop it (Ctrl+C).
 
 ### Run only one part (single run, no hourly loop)
 
@@ -197,9 +187,7 @@ The workflow runs on a **cron schedule** (default: once per day at 06:00 UTC). E
    | `GARMIN_PASSWORD` | Yes | Your Garmin Connect password |
    | `NOTION_API_KEY` | Yes | Notion integration secret (from step 1.1) |
    | `NOTION_PAGE_ID` | Yes | Page ID where the DBs live (from step 1.2) |
-   | `RUN_MEAL_ANALYSIS` | No | `True` to enable Meals in the workflow; omit or `False` for Garmin only |
-   | `MISTRAL_AI_API_KEY` | If Meals | Mistral API key (only if `RUN_MEAL_ANALYSIS=True`) |
-   | `MISTRAL_MODEL` | No | e.g. `pixtral-12b-2409` (optional; default is used if unset) |
+   | `MISTRAL_AI_API_KEY` | If Meals | Mistral API key (only if you enable Meals in `params.py`) |
 
 3. Push the repo (the workflow file is already in `.github/workflows/sync-garmin-notion.yml`). The workflow uses `RUN_ONCE=1` so it runs `main.py` once and exits (no hourly loop).
 
@@ -228,6 +216,6 @@ Garmin Connect login does not support 2FA for this type of access; use an app pa
 - [ ] Notion integration created; **NOTION_API_KEY** copied.
 - [ ] Notion page created; **NOTION_PAGE_ID** copied from URL.
 - [ ] Page shared with the integration (**••• → Add connections**).
-- [ ] `.env` filled with Garmin and Notion keys; set **RUN_MEAL_ANALYSIS** (default `False` = Garmin only).
-- [ ] If **RUN_MEAL_ANALYSIS=True**: Mistral account created, API key and budget set; **MISTRAL_AI_API_KEY** in `.env`.
+- [ ] `.env` filled with Garmin, Notion, and (optionally) Mistral keys.
+- [ ] `params.py` edited: set `RUN_MEAL_ANALYSIS`, `model`, and `SYNC_INTERVAL_MINUTES` as desired.
 - [ ] `pip install -r requirements.txt` and `python main.py` run at least once so **📊 Garmin Daily** (and **🍽️ Meals** if enabled) are created under that page.

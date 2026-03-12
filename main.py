@@ -7,18 +7,11 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 from notion_db import get_or_create_garmin_db, get_or_create_meals_db
+from params import RUN_MEAL_ANALYSIS, SYNC_INTERVAL_MINUTES
 from sync_garmin import main as sync_garmin_main
 from sync_meals import main as sync_meals_main
 
 load_dotenv()
-
-DEFAULT_SYNC_INTERVAL_MINUTES = 60
-
-
-def _run_meal_analysis() -> bool:
-    """True if RUN_MEAL_ANALYSIS is set to a truthy value (e.g. True, 1, yes)."""
-    v = os.environ.get("RUN_MEAL_ANALYSIS", "").strip().lower()
-    return v in ("true", "1", "yes", "on")
 
 
 def main():
@@ -30,24 +23,26 @@ def main():
 
     print("Ensuring databases exist…")
     get_or_create_garmin_db(notion_key, page_id)
-    if _run_meal_analysis():
+    if RUN_MEAL_ANALYSIS:
         get_or_create_meals_db(notion_key, page_id)
     print("Running Garmin sync…")
     sync_garmin_main()
-    if _run_meal_analysis():
+    if RUN_MEAL_ANALYSIS:
         print("Running Meals analysis…")
         sync_meals_main()
     else:
-        print("Meals analysis skipped (RUN_MEAL_ANALYSIS not enabled).")
+        print("Meals analysis skipped (RUN_MEAL_ANALYSIS is False in params.py).")
 
 
 def _sync_interval_seconds() -> float:
-    """Seconds to sleep between runs (from SYNC_INTERVAL_MINUTES, default 60). Clamped to 1–1440 minutes."""
-    raw = os.environ.get("SYNC_INTERVAL_MINUTES", "").strip() or str(DEFAULT_SYNC_INTERVAL_MINUTES)
-    try:
-        minutes = max(1, min(1440, int(raw)))
-    except ValueError:
-        minutes = DEFAULT_SYNC_INTERVAL_MINUTES
+    """Seconds to sleep between runs, based on SYNC_INTERVAL_MINUTES in params.py (clamped to 1–1440 minutes)."""
+    minutes = SYNC_INTERVAL_MINUTES
+    if not isinstance(minutes, int):
+        try:
+            minutes = int(minutes)
+        except (TypeError, ValueError):
+            minutes = 60
+    minutes = max(1, min(1440, minutes))
     return minutes * 60.0
 
 
