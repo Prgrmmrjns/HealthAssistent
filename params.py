@@ -6,11 +6,11 @@ Edit these values to change behavior without touching code:
 - SYNC_INTERVAL_MINUTES: minutes between daemon runs when running python main.py locally
 """
 
-RUN_MEAL_ANALYSIS: bool = False
+RUN_MEAL_ANALYSIS: bool = True
 
 # Mistral model to use for analyzing meal images.
 model: str = "mistral-large-2512"
 
 # Minutes between sync runs when running main.py as a daemon (ignored if RUN_ONCE=1).
-SYNC_INTERVAL_MINUTES: int = 60
+SYNC_INTERVAL_MINUTES: int = 5
 
