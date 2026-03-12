@@ -1,88 +1,208 @@
-# Health Assistant
+# Garmin + Meals → Notion
 
-A Django fitness app that syncs Garmin data, tracks workouts, meals, and daily check-ins.
+Sync Garmin Connect daily metrics into a Notion database. Optionally analyze meal photos with Mistral AI (name, macros, kcals, meal components). **Modular:** you can run **Garmin-only** (no Meals, no LLM cost, works on Notion Free) by setting `RUN_MEAL_ANALYSIS=False` in `.env`.
 
-## Features
+- **Garmin sync** – Always runs. One database **📊 Garmin Daily** is created under your Notion page; one row per day.
+- **Meals analysis** – Only if `RUN_MEAL_ANALYSIS=True`. Creates **🍽️ Meals** DB and uses Mistral to analyze meal images. Requires a **Notion Plus / Education Plus** plan (image uploads) and a **Mistral API key** (paid usage).
 
-- **Dashboard** – Overview of workouts, daily stats, steps, and today’s meals
-- **Garmin sync** – Import activities and daily stats from Garmin Connect
-- **Workouts** – List and detail views for activities with exercise sets
-- **Meals** – Meal logging with optional AI-powered nutrition estimates (Mistral)
-- **Daily check-ins** – Mood, energy, sleep, and notes
-- **Workout templates** – Reusable templates for strength training
-- **Progress** – Track weight, VO2 max, and other metrics over time
+---
 
-## Setup
+## 1. What to do in Notion first
 
-### 1. Clone and install
+### 1.1 Create a Notion integration
 
-```bash
-git clone https://github.com/YOUR_USERNAME/HealthAssistent.git
-cd HealthAssistent
-pip install -r requirements.txt
-```
+1. Go to [Notion Integrations](https://www.notion.so/my-integrations).
+2. Click **+ New integration**.
+3. Name it (e.g. “Garmin Meals Sync”), select your workspace, then click **Submit**.
+4. Open the integration and copy the **Internal Integration Secret** (starts with `ntn_` or `secret_`). This is your **NOTION_API_KEY**.
 
-### 2. Environment variables
+### 1.2 Create a page that will hold the databases
 
-Copy the example env file and add your credentials:
+1. In Notion, create a **new page** (e.g. “Health” or “Fitness”) where you want the Garmin and Meals databases to live.
+2. Open that page and copy its URL, e.g.:
+   ```
+   https://www.notion.so/yournamehere/PageName-31b4205a2f858092bdcasfdffd3212f3?source=copy_link
+   ```
+3. The **page ID** is the part between `PageName-` and `?source=copy_link`:  
+   e.g. here it would be `31b4205a2f858092bdcasfdffd3212f3`
+   This is your **NOTION_PAGE_ID**.
 
-```bash
-cp .env.example .env
-```
+### 1.3 Share the page with your integration
 
-Edit `.env`:
+1. Open **the same page** in Notion.
+2. Click **•••** (top right) → **Add connections** (or **Connections**).
+3. Find your integration (e.g. “Garmin Meals Sync”) and select it.
+4. Confirm. The integration can now create and edit databases and pages under this page.
+
+You do **not** create the databases yourself. The script creates **📊 Garmin Daily** (and optionally **🍽️ Meals** when `RUN_MEAL_ANALYSIS=True`) under this page when you run it, only if they don’t already exist.
+
+---
+
+## 2. Environment variables
+
+Copy `.env.example` to `.env` and fill in:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GARMIN_EMAIL` | Yes | Your Garmin Connect email |
-| `GARMIN_PASSWORD` | Yes | Your Garmin Connect password |
-| `SUPABASE_DB_URL` | For Supabase | Postgres connection string from [Supabase](https://supabase.com) (Project Settings → Database → URI) |
-| `DJANGO_SECRET_KEY` | For production | Secret key (defaults to dev value if unset) |
-| `MISTRAL_AI_API_KEY` | No | For AI meal analysis ([get key](https://console.mistral.ai/)) |
+| `GARMIN_EMAIL` | Yes (for Garmin sync) | Garmin Connect login email |
+| `GARMIN_PASSWORD` | Yes (for Garmin sync) | Garmin Connect password |
+| `NOTION_API_KEY` | Yes | Notion integration secret (from step 1.1) |
+| `NOTION_PAGE_ID` | Yes | Page ID where DBs live (from step 1.2) |
+| `RUN_MEAL_ANALYSIS` | No | `True` to enable Meals DB + Mistral meal analysis; `False` or unset = Garmin only (default: `False`) |
+| `MISTRAL_AI_API_KEY` | Yes (if Meals) | Mistral API key for meal image analysis (only needed when `RUN_MEAL_ANALYSIS=True`) |
+| `MISTRAL_MODEL` | No | Mistral model for image analysis (default: `pixtral-12b-2409`) |
+| `SYNC_DAYS` | No | Days of Garmin history to sync (default: 30) |
 
-### 3. Database (Supabase)
+**Garmin-only (no Meals):** set `RUN_MEAL_ANALYSIS=False` or leave it out. No Mistral key or Notion Plus needed.
 
-1. Create a project at [supabase.com](https://supabase.com).
-2. Go to **Project Settings** → **Database** → copy the **Connection string** (URI, Session mode).
-3. Add `SUPABASE_DB_URL` to `.env` with that URI.
-4. Run migrations to create tables:
+Example `.env` (Garmin + Meals):
 
-```bash
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py sync_garmin --days 30
-python manage.py runserver
+```env
+GARMIN_EMAIL=you@example.com
+GARMIN_PASSWORD=your_password
+NOTION_API_KEY=ntn_xxxxxxxxxxxx
+NOTION_PAGE_ID=31b4205a2f858092bdccf95ffd3212f3
+RUN_MEAL_ANALYSIS=True
+MISTRAL_AI_API_KEY=your_mistral_key
+# MISTRAL_MODEL=pixtral-12b-2409
+# SYNC_DAYS=30
 ```
 
-This creates: `fitness_dailystats`, `fitness_workout`, `fitness_workoutset`, `fitness_dailycheckin`, `fitness_meal`, `fitness_exercise`, `fitness_workouttemplate`, `fitness_templateexercise`, `fitness_userprofile`.
+Example `.env` (Garmin only, no LLM cost):
 
-Open http://127.0.0.1:8000 and log in. The fitness dashboard is at `/fitness/`.
+```env
+GARMIN_EMAIL=you@example.com
+GARMIN_PASSWORD=your_password
+NOTION_API_KEY=ntn_xxxxxxxxxxxx
+NOTION_PAGE_ID=31b4205a2f858092bdccf95ffd3212f3
+RUN_MEAL_ANALYSIS=False
+# SYNC_DAYS=30
+```
 
-## Management commands
+---
 
-| Command | Description |
-|---------|-------------|
-| `python manage.py sync_garmin` | Sync last 30 days from Garmin (use `--days N` for custom range) |
-| `python manage.py seed_exercises` | Seed exercises from Garmin Connect catalogue |
+## 2b. Mistral account and API budget (only if RUN_MEAL_ANALYSIS=True)
 
-## Deploy on Render
+1. Go to [Mistral AI](https://mistral.ai/) and sign up / log in.
+2. Open [Console](https://console.mistral.ai/) → **API Keys** and create an API key. Copy it into `.env` as `MISTRAL_AI_API_KEY`.
+3. Set a **usage budget** so you don’t overspend:
+   - In the Mistral console, go to **Billing** or **Usage** and set a monthly budget or alert (e.g. €5 or $5). Meal image analysis uses the Pixtral model; cost depends on how many images you analyze per run and how often you run.
+4. If you leave `RUN_MEAL_ANALYSIS=False`, you never call Mistral and incur no LLM cost.
 
-1. Create a **Web Service** and connect your repo.
-2. Use **Supabase** as the database (no Render Postgres):
-   - In Render → Web Service → **Environment**, add `SUPABASE_DB_URL` = your Supabase connection string (Project Settings → Database → URI).
-3. Add: `GARMIN_EMAIL`, `GARMIN_PASSWORD`, and optionally `DJANGO_SECRET_KEY`, `MISTRAL_AI_API_KEY`.
-4. Configure:
-   - **Build Command:** `pip install -r requirements.txt && python manage.py collectstatic --no-input`
-   - **Start Command:** `gunicorn config.wsgi:application`
-   - **Pre-Deploy Command:** `python manage.py migrate --no-input`
-5. Deploy.
+---
 
-## Project structure
+## 3. Install and run
 
-- `config/` – Django project settings
-- `fitness/` – Main app (models, views, templates, Garmin sync, AI helpers)
-- `manage.py` – Django management script
+```bash
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env with your values (see above)
+```
 
-## License
+### Recommended: run everything (daemon, every full hour)
 
-For personal use. Garmin Connect usage subject to Garmin’s Terms of Service.
+```bash
+python main.py
+```
+
+This script:
+
+1. **Runs immediately once**:
+   - Ensures databases exist – creates **📊 Garmin Daily** (and **🍽️ Meals** only if `RUN_MEAL_ANALYSIS=True`) under your Notion page, only if they don’t already exist.
+   - Syncs Garmin – logs into Garmin Connect and creates/updates one row per day in Garmin Daily.
+   - If `RUN_MEAL_ANALYSIS=True`: analyzes Meals – finds rows with **Image** but empty **Intake**, sends the image to Mistral, and fills Intake, macros, kcals, and Meal components. If `False`, this step is skipped.
+2. **Then runs again every full hour** (e.g. 13:00, 14:00, 15:00, …) until you stop it (Ctrl+C). It sleeps until the next full hour between runs.
+
+### Run only one part (single run, no hourly loop)
+
+- **Garmin sync only** (DB must already exist, e.g. after one `main.py` run):
+  ```bash
+  python sync_garmin.py
+  ```
+- **Meals analysis only** (when `RUN_MEAL_ANALYSIS=True`; DB must already exist):
+  ```bash
+  python sync_meals.py
+  ```
+
+If you run `sync_garmin.py` or `sync_meals.py` before ever running `main.py`, you’ll get a message to run `main.py` first so the databases are created.
+
+---
+
+## 4. Database schemas (created automatically)
+
+When `main.py` creates the databases, they get these properties. **Garmin Daily** is always created; **Meals** is only created when `RUN_MEAL_ANALYSIS=True`. You don’t add properties by hand unless you use an old Meals DB and want kcals / Meal components.
+
+### 📊 Garmin Daily
+
+| Property | Type | Description |
+|----------|------|-------------|
+| Date | Title | Row label (e.g. date string) |
+| date | Date | Same date; used for finding/updating rows |
+| steps | Number | Total steps |
+| total_calories | Number | Total kilocalories |
+| active_calories | Number | Active kilocalories |
+| resting_hr | Number | Resting heart rate |
+| avg_stress | Number | Average stress level |
+| body_battery_high | Number | Body Battery charged |
+| body_battery_low | Number | Body Battery drained |
+| intensity_minutes | Number | Moderate + vigorous activity minutes |
+| sleep_hours | Number | Sleep duration (hours) |
+| hrv | Number | HRV (e.g. last night avg) |
+| weight_kg | Number | Weight in kg |
+
+### 🍽️ Meals
+
+| Property | Type | Description |
+|----------|------|-------------|
+| Intake | Title | Meal name (from AI or manual) |
+| Time | Date | When you ate |
+| Image | Files | Meal photo (optional) |
+| Meal components | Rich text | AI: list of components (e.g. "chicken, rice, broccoli") |
+| kcals | Number | Calculated: 4×P + 4×C + 9×F + 2×fiber |
+| Proteins | Number | Grams |
+| Fats | Number | Grams |
+| Carbohydrates | Number | Grams |
+| Sugars | Number | Grams (AI leaves 0) |
+| Dietary Fibers | Number | Grams |
+
+---
+
+## 5. How to use Meals with AI (only when RUN_MEAL_ANALYSIS=True)
+
+1. In the **🍽️ Meals** database (under your Notion page), add a **new row**.
+2. Upload a photo in the **Image** property.
+3. Leave **Intake** (and optionally the macro fields) empty.
+4. Run `python main.py` or `python sync_meals.py`.
+5. The script finds rows with Image set and Intake empty, sends the image to Mistral Pixtral, and fills **Intake**, **Meal components**, **kcals**, **Proteins**, **Fats**, **Carbohydrates**, **Dietary Fibers** (and **Sugars** = 0).
+
+**kcals** is always computed from macros (4 kcal/g protein, 4 kcal/g carbs, 9 kcal/g fat, 2 kcal/g fiber), not taken from the AI.
+
+---
+
+## 6. GitHub Actions (optional)
+
+To run the sync on a schedule (e.g. daily):
+
+1. In your repo: **Settings → Secrets and variables → Actions**, add:
+   - `GARMIN_EMAIL`
+   - `GARMIN_PASSWORD`
+   - `NOTION_API_KEY`
+   - `NOTION_PAGE_ID`
+   - `RUN_MEAL_ANALYSIS` (optional; set to `True` if you want Meals in the workflow)
+   - `MISTRAL_AI_API_KEY` (only if `RUN_MEAL_ANALYSIS=True`)
+2. Update `.github/workflows/sync-garmin-notion.yml` so it:
+   - Uses `NOTION_PAGE_ID` instead of `NOTION_DATABASE_ID`.
+   - Runs `python main.py` (or `python sync_garmin.py` if you only want Garmin) from the repo root with `pip install -r requirements.txt` in the same repo.
+
+Garmin Connect login does not support 2FA for this type of access; use an app password or a dedicated account if your main account has 2FA.
+
+---
+
+## 7. Summary checklist
+
+- [ ] Notion integration created; **NOTION_API_KEY** copied.
+- [ ] Notion page created; **NOTION_PAGE_ID** copied from URL.
+- [ ] Page shared with the integration (**••• → Add connections**).
+- [ ] `.env` filled with Garmin and Notion keys; set **RUN_MEAL_ANALYSIS** (default `False` = Garmin only).
+- [ ] If **RUN_MEAL_ANALYSIS=True**: Mistral account created, API key and budget set; **MISTRAL_AI_API_KEY** in `.env`.
+- [ ] `pip install -r requirements.txt` and `python main.py` run at least once so **📊 Garmin Daily** (and **🍽️ Meals** if enabled) are created under that page.
