@@ -1,4 +1,4 @@
-"""Ensure Garmin Daily and Meals databases exist (create only if missing), then run sync_garmin and sync_meals. Runs every full hour when started as a daemon."""
+"""Ensure Garmin Daily and Meals databases exist (create only if missing), then run sync_garmin and sync_meals. When not RUN_ONCE, runs every SYNC_INTERVAL_MINUTES (default 60)."""
 
 import os
 import time
@@ -11,6 +11,8 @@ from sync_garmin import main as sync_garmin_main
 from sync_meals import main as sync_meals_main
 
 load_dotenv()
+
+DEFAULT_SYNC_INTERVAL_MINUTES = 60
 
 
 def _run_meal_analysis() -> bool:
@@ -39,11 +41,14 @@ def main():
         print("Meals analysis skipped (RUN_MEAL_ANALYSIS not enabled).")
 
 
-def seconds_until_next_hour() -> float:
-    """Seconds until the next full hour (e.g. 14:23 -> sleep until 15:00)."""
-    now = datetime.now()
-    next_hour = (now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1))
-    return (next_hour - now).total_seconds()
+def _sync_interval_seconds() -> float:
+    """Seconds to sleep between runs (from SYNC_INTERVAL_MINUTES, default 60). Clamped to 1–1440 minutes."""
+    raw = os.environ.get("SYNC_INTERVAL_MINUTES", "").strip() or str(DEFAULT_SYNC_INTERVAL_MINUTES)
+    try:
+        minutes = max(1, min(1440, int(raw)))
+    except ValueError:
+        minutes = DEFAULT_SYNC_INTERVAL_MINUTES
+    return minutes * 60.0
 
 
 if __name__ == "__main__":
@@ -51,8 +56,8 @@ if __name__ == "__main__":
     if os.environ.get("RUN_ONCE", "").strip().lower() in ("1", "true", "yes", "on"):
         exit(0)
     while True:
-        secs = seconds_until_next_hour()
-        next_run = datetime.now().replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+        secs = _sync_interval_seconds()
+        next_run = datetime.now() + timedelta(seconds=secs)
         print(f"Next run at {next_run.strftime('%H:%M')} (sleeping {int(secs)}s)")
         time.sleep(secs)
         main()

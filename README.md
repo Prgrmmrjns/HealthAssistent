@@ -51,6 +51,7 @@ Copy `.env.example` to `.env` and fill in:
 | `RUN_MEAL_ANALYSIS` | No | `True` to enable Meals DB + Mistral meal analysis; `False` or unset = Garmin only (default: `False`) |
 | `MISTRAL_AI_API_KEY` | Yes (if Meals) | Mistral API key for meal image analysis (only needed when `RUN_MEAL_ANALYSIS=True`) |
 | `MISTRAL_MODEL` | No | Mistral model for image analysis (default: `pixtral-12b-2409`) |
+| `SYNC_INTERVAL_MINUTES` | No | Minutes between sync runs when running as daemon (default: 60). Ignored if `RUN_ONCE=1`. |
 | `SYNC_DAYS` | No | Days of Garmin history to sync (default: 30) |
 
 **Garmin-only (no Meals):** set `RUN_MEAL_ANALYSIS=False` or leave it out. No Mistral key or Notion Plus needed.
@@ -65,6 +66,7 @@ NOTION_PAGE_ID=31b4205a2f858092bdccf95ffd3212f3
 RUN_MEAL_ANALYSIS=True
 MISTRAL_AI_API_KEY=your_mistral_key
 # MISTRAL_MODEL=pixtral-12b-2409
+# SYNC_INTERVAL_MINUTES=60
 # SYNC_DAYS=30
 ```
 
@@ -76,6 +78,7 @@ GARMIN_PASSWORD=your_password
 NOTION_API_KEY=ntn_xxxxxxxxxxxx
 NOTION_PAGE_ID=31b4205a2f858092bdccf95ffd3212f3
 RUN_MEAL_ANALYSIS=False
+# SYNC_INTERVAL_MINUTES=60
 # SYNC_DAYS=30
 ```
 
@@ -111,7 +114,7 @@ This script:
    - Ensures databases exist – creates **📊 Garmin Daily** (and **🍽️ Meals** only if `RUN_MEAL_ANALYSIS=True`) under your Notion page, only if they don’t already exist.
    - Syncs Garmin – logs into Garmin Connect and creates/updates one row per day in Garmin Daily.
    - If `RUN_MEAL_ANALYSIS=True`: analyzes Meals – finds rows with **Image** but empty **Intake**, sends the image to Mistral, and fills Intake, macros, kcals, and Meal components. If `False`, this step is skipped.
-2. **Then runs again every full hour** (e.g. 13:00, 14:00, 15:00, …) until you stop it (Ctrl+C). It sleeps until the next full hour between runs.
+2. **Then repeats every `SYNC_INTERVAL_MINUTES`** (default 60). It sleeps that long between runs until you stop it (Ctrl+C).
 
 ### Run only one part (single run, no hourly loop)
 
@@ -181,7 +184,7 @@ When `main.py` creates the databases, they get these properties. **Garmin Daily*
 
 ## 6. Deploy with GitHub Actions
 
-The workflow runs **once per day** at 06:00 UTC (and you can trigger it manually). Each run ensures DBs exist, syncs Garmin, and optionally runs Meals analysis.
+The workflow runs on a **cron schedule** (default: once per day at 06:00 UTC). Each run ensures DBs exist, syncs Garmin, and optionally runs Meals analysis. **GitHub allows a minimum schedule of every 5 minutes** – you can run as often as every 5 minutes by changing the cron (see 6.3).
 
 ### 6.1 Add repository secrets
 
@@ -202,8 +205,19 @@ The workflow runs **once per day** at 06:00 UTC (and you can trigger it manually
 
 ### 6.2 Run the workflow
 
-- **Automatic:** runs daily at 06:00 UTC.
+- **Automatic:** according to the cron in the workflow file (default: daily at 06:00 UTC).
 - **Manual:** **Actions** tab → **Sync Garmin to Notion** → **Run workflow**.
+
+### 6.3 Schedule frequency (cron)
+
+GitHub Actions **minimum interval is 5 minutes**. To run every 5 minutes, edit `.github/workflows/sync-garmin-notion.yml` and set:
+
+```yaml
+schedule:
+  - cron: "*/5 * * * *"   # Every 5 minutes
+```
+
+Other examples: `0 * * * *` = every hour on the hour; `0 6 * * *` = once daily at 06:00 UTC. The daemon interval (`SYNC_INTERVAL_MINUTES` in `.env`) only applies when you run `python main.py` locally; in Actions, frequency is controlled only by the workflow cron.
 
 Garmin Connect login does not support 2FA for this type of access; use an app password or a dedicated account if your main account has 2FA.
 
