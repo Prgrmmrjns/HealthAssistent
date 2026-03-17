@@ -9,18 +9,23 @@ import garminconnect
 import requests
 from dotenv import load_dotenv
 
-from notion_db import GARMIN_NUMBER_KEYS, _headers, get_garmin_db_id
+from main import GARMIN_NUMBER_KEYS, _headers, get_garmin_db_id
+from params import SYNC_PRIOR_GARMIN_DAYS
 
 load_dotenv()
 
 
 def fetch_daily_stats(garmin, date_str: str) -> dict:
     def num(v, cast=int):
+        if v is None:
+            return None
         x = cast(v)
         return None if cast == float and x != x else x
 
     out = {}
     summary = garmin.get_stats(date_str)
+    # Some metrics are not reliably present in get_stats() for all accounts/devices.
+    # Fall back to dedicated endpoints where possible.
     out["steps"] = num(summary.get("totalSteps"))
     out["total_calories"] = num(summary.get("totalKilocalories"))
     out["active_calories"] = num(summary.get("activeKilocalories"))
@@ -31,6 +36,30 @@ def fetch_daily_stats(garmin, date_str: str) -> dict:
     mod = num(summary.get("moderateIntensityMinutes")) or 0
     vig = num(summary.get("vigorousIntensityMinutes")) or 0
     out["intensity_minutes"] = mod + vig
+
+    # Stress: try dedicated endpoint if missing.
+    if out["avg_stress"] is None:
+        try:
+            stress = garmin.get_stress_data(date_str) or {}
+            # Typical shape: {"avgStressLevel": 23, ...}
+            out["avg_stress"] = num(stress.get("avgStressLevel") or stress.get("averageStressLevel"))
+        except Exception:
+            pass
+
+    # Body battery: try dedicated endpoint if missing.
+    if out["body_battery_high"] is None or out["body_battery_low"] is None:
+        try:
+            bb = garmin.get_body_battery(date_str) or {}
+            # Typical shape: {"bodyBatteryHighestValue": ..., "bodyBatteryLowestValue": ...}
+            out["body_battery_high"] = out["body_battery_high"] or num(
+                bb.get("bodyBatteryHighestValue") or bb.get("bodyBatteryChargedValue")
+            )
+            out["body_battery_low"] = out["body_battery_low"] or num(
+                bb.get("bodyBatteryLowestValue") or bb.get("bodyBatteryDrainedValue")
+            )
+        except Exception:
+            pass
+
     sleep = garmin.get_sleep_data(date_str)
     secs = sleep.get("dailySleepDTO", {}).get("sleepTimeSeconds")
     out["sleep_hours"] = round(secs / 3600, 1) if secs else None
@@ -67,6 +96,30 @@ def _query_page_by_date(api_key: str, database_id: str, date_str: str) -> str | 
     return results[0]["id"] if results else None
 
 
+def _existing_dates_since(api_key: str, database_id: str, start_date_str: str) -> set[str]:
+    """Return set of YYYY-MM-DD dates already present in the DB since start (inclusive)."""
+    url = f"https://api.notion.com/v1/databases/{database_id}/query"
+    payload: dict = {
+        "filter": {"property": "date", "date": {"on_or_after": start_date_str}},
+        "page_size": 100,
+    }
+    out: set[str] = set()
+    while True:
+        r = requests.post(url, json=payload, headers=_headers(api_key), timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        for page in data.get("results") or []:
+            props = page.get("properties") or {}
+            d = ((props.get("date") or {}).get("date") or {}).get("start")
+            if isinstance(d, str) and len(d) >= 10:
+                out.add(d[:10])
+        nxt = data.get("next_cursor")
+        if not nxt:
+            break
+        payload["start_cursor"] = nxt
+    return out
+
+
 def _create_page(api_key: str, database_id: str, date_str: str, stats: dict):
     requests.post(
         "https://api.notion.com/v1/pages",
@@ -96,9 +149,13 @@ def main():
     notion_key = os.environ.get("NOTION_API_KEY", "").strip()
     page_id = os.environ.get("NOTION_PAGE_ID", "").strip()
 
+    if not notion_key:
+        print("Set NOTION_API_KEY in .env")
+        return
+
     database_id = get_garmin_db_id(notion_key, page_id)
     if not database_id:
-        print("Garmin Daily database not found. Run main.py first to create databases.")
+        print("Garmin Daily database not found. Set GARMIN_DB_ID or run main.py to create databases.")
         return
 
     requests.post(
@@ -112,21 +169,46 @@ def main():
     garmin = garminconnect.Garmin(email=email, password=password)
     garmin.login()
 
-    # Only sync today's date; no historical backfill here.
-    today = datetime.now().date()
-    ds = today.strftime("%Y-%m-%d")
-    stats = fetch_daily_stats(garmin, ds)
-    if not any(v is not None for v in stats.values()):
-        print(f"No data for {ds}, nothing to write.")
-        return
+    # Backfill missing prior days (create only), then sync today (update/create).
+    days = SYNC_PRIOR_GARMIN_DAYS
+    if not isinstance(days, int):
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            days = 0
+    days = max(0, min(365, days))
 
-    page_id_res = _query_page_by_date(notion_key, database_id, ds)
-    if page_id_res:
-        _update_page(notion_key, page_id_res, stats)
-        print(f"Updated {ds}")
-    else:
+    today = datetime.now().date()
+    start = today - timedelta(days=days)
+    start_str = start.strftime("%Y-%m-%d")
+    existing_dates = _existing_dates_since(notion_key, database_id, start_str)
+
+    # Create missing historical days (skip existing to minimize Notion calls).
+    for i in range(days):
+        d = start + timedelta(days=i)
+        ds = d.strftime("%Y-%m-%d")
+        if ds in existing_dates:
+            continue
+        stats = fetch_daily_stats(garmin, ds)
         _create_page(notion_key, database_id, ds, stats)
-        print(f"Created {ds}")
+        if any(v is not None for v in stats.values()):
+            print(f"Created {ds}")
+        else:
+            print(f"Created {ds} (no Garmin metrics returned)")
+
+    # Today: update if exists, else create.
+    ds_today = today.strftime("%Y-%m-%d")
+    stats_today = fetch_daily_stats(garmin, ds_today)
+    page_id_res = _query_page_by_date(notion_key, database_id, ds_today)
+    if page_id_res:
+        _update_page(notion_key, page_id_res, stats_today)
+        print(f"Updated {ds_today}")
+    else:
+        _create_page(notion_key, database_id, ds_today, stats_today)
+        if any(v is not None for v in stats_today.values()):
+            print(f"Created {ds_today}")
+        else:
+            print(f"Created {ds_today} (no Garmin metrics returned)")
 
 
 if __name__ == "__main__":

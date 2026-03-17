@@ -13,8 +13,8 @@ import re
 import requests
 from dotenv import load_dotenv
 
-from notion_db import _headers, get_database_property_names, get_meals_db_id
-from params import model
+from main import _headers, get_database_property_names, get_database_property_types, get_meals_db_id
+from params import MEAL_INSTRUCTIONS, model
 
 load_dotenv()
 
@@ -24,14 +24,24 @@ FOOD_ANALYSIS_PROMPT = """Analyze this food image and estimate the macronutrient
 
 Return a JSON object with these fields:
 - "description": A brief description of the food items you see (use as the meal name)
-- "meal_components": An array of strings listing each main component (e.g. ["grilled chicken", "white rice", "steamed broccoli"])
+- "meal_components": An array of strings listing each main component (e.g. ["plant-based protein", "rice", "steamed broccoli"])
 - "calories": Estimated total calories (integer)
 - "protein_g": Estimated protein in grams (float, 1 decimal)
 - "carbs_g": Estimated carbohydrates in grams (float, 1 decimal)
 - "fat_g": Estimated fat in grams (float, 1 decimal)
 - "fiber_g": Estimated dietary fiber in grams (float, 1 decimal)
 
-Be realistic with portion sizes. Return ONLY valid JSON, no markdown."""
+Be realistic with portion sizes.
+
+CRITICAL DIET / USER CONSTRAINTS (HIGHEST PRIORITY):
+- You MUST follow the instructions below even if the image looks ambiguous.
+- If the instructions imply vegan/vegetarian constraints, do NOT label items as animal products (e.g. "chicken", "beef", "cheese", "milk", "egg").
+  Instead, use plant-based alternatives in the wording (e.g. "plant-based chicken alternative", "vegan cheese", "plant milk").
+
+User instructions:
+{MEAL_INSTRUCTIONS}
+
+Return ONLY valid JSON, no markdown."""
 
 
 def _parse_ai_response(text: str) -> dict | None:
@@ -147,13 +157,15 @@ def update_meal_page(api_key: str, page_id: str, result: dict, database_id: str)
     kcals = _kcals_from_macros(p, c, f, fiber)
     components = result.get("meal_components")
     if isinstance(components, list):
-        components_text = ", ".join(str(x) for x in components)[:2000]
+        components_list = [str(x).strip() for x in components if str(x).strip()]
+    elif isinstance(components, str) and components.strip():
+        # Best-effort split if the model returns a single string.
+        components_list = [x.strip() for x in components.split(",") if x.strip()]
     else:
-        components_text = (components or "")[:2000] if components else ""
+        components_list = []
 
     all_props = {
         "Intake": {"title": [{"type": "text", "text": {"content": description[:2000]}}]},
-        "Meal components": {"rich_text": [{"type": "text", "text": {"content": components_text}}]} if components_text else None,
         "kcals": {"number": kcals},
         "Proteins": {"number": round(p, 1)},
         "Fats": {"number": round(f, 1)},
@@ -162,6 +174,16 @@ def update_meal_page(api_key: str, page_id: str, result: dict, database_id: str)
         "Dietary Fibers": {"number": round(fiber, 1)},
     }
     existing = get_database_property_names(api_key, database_id)
+    types = get_database_property_types(api_key, database_id)
+
+    # Meal components: write as multi_select when configured; fall back to rich_text for older DBs.
+    if "Meal components" in existing and components_list:
+        if types.get("Meal components") == "multi_select":
+            all_props["Meal components"] = {"multi_select": [{"name": x[:100]} for x in components_list[:25]]}
+        elif types.get("Meal components") == "rich_text":
+            joined = ", ".join(components_list)[:2000]
+            all_props["Meal components"] = {"rich_text": [{"type": "text", "text": {"content": joined}}]}
+
     props = {k: v for k, v in all_props.items() if v is not None and k in existing}
     if not props:
         return
@@ -179,13 +201,13 @@ def main():
     page_id = os.environ.get("NOTION_PAGE_ID", "").strip()
     mistral_key = os.environ.get("MISTRAL_AI_API_KEY", "").strip()
 
-    if not notion_key or not page_id:
-        print("Set NOTION_API_KEY and NOTION_PAGE_ID in .env")
+    if not notion_key:
+        print("Set NOTION_API_KEY in .env")
         return
 
     db_id = get_meals_db_id(notion_key, page_id)
     if not db_id:
-        print("Meals database not found. Run main.py first to create databases.")
+        print("Meals database not found. Set MEALS_DB_ID or run main.py to create databases.")
         return
 
     if not mistral_key:
