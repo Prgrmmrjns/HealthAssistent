@@ -78,6 +78,27 @@ def _run_sync() -> dict:
         _RUNNING = False
 
 
+def _run_meals_only() -> dict:
+    global _LAST_RUN_UTC, _LAST_RESULT, _RUNNING
+    if _RUNNING:
+        raise HTTPException(status_code=409, detail="Sync already running")
+    _RUNNING = True
+    try:
+        os.environ["RUN_ONCE"] = "1"
+        from sync_meals import main as meals_main
+
+        meals_main()
+        _LAST_RUN_UTC = datetime.now(timezone.utc)
+        _LAST_RESULT = {"ok": True, "meals_only": True}
+        return _LAST_RESULT
+    except Exception as e:
+        _LAST_RUN_UTC = datetime.now(timezone.utc)
+        _LAST_RESULT = {"ok": False, "meals_only": True, "error": str(e)}
+        return _LAST_RESULT
+    finally:
+        _RUNNING = False
+
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     return HTMLResponse(
@@ -106,6 +127,7 @@ def home():
       <div id="status" class="muted">Loading…</div>
       <div style="margin-top:12px;">
         <button id="runBtn" onclick="runNow()">Run now</button>
+        <button id="mealsBtn" style="margin-left:8px;" onclick="runMeals()">Run Meals (Mistral)</button>
       </div>
       <div id="result" style="margin-top:12px;"></div>
     </div>
@@ -130,15 +152,29 @@ def home():
           Running: <code>${j.running}</code>
         `;
         document.getElementById('runBtn').disabled = !!j.running;
+        document.getElementById('mealsBtn').disabled = !!j.running;
       }
 
       async function runNow() {
         document.getElementById('runBtn').disabled = true;
+        document.getElementById('mealsBtn').disabled = true;
         document.getElementById('result').innerHTML = '<span class="muted">Running…</span>';
         const r = await fetch('/api/run', { method: 'POST' });
         const j = await r.json();
         document.getElementById('result').innerHTML = j.ok
           ? '<span class="good">OK: sync executed</span>'
+          : '<span class="bad">Error: ' + (j.error || 'unknown') + '</span>';
+        await refresh();
+      }
+
+      async function runMeals() {
+        document.getElementById('runBtn').disabled = true;
+        document.getElementById('mealsBtn').disabled = true;
+        document.getElementById('result').innerHTML = '<span class="muted">Running Meals…</span>';
+        const r = await fetch('/api/meals/run', { method: 'POST' });
+        const j = await r.json();
+        document.getElementById('result').innerHTML = j.ok
+          ? '<span class="good">OK: meals analysis executed</span>'
           : '<span class="bad">Error: ' + (j.error || 'unknown') + '</span>';
         await refresh();
       }
@@ -168,6 +204,11 @@ def status():
 @app.post("/api/run")
 def run():
     return JSONResponse(_run_sync())
+
+
+@app.post("/api/meals/run")
+def run_meals():
+    return JSONResponse(_run_meals_only())
 
 
 @app.get("/api/cron")
