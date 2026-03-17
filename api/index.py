@@ -22,23 +22,15 @@ _LAST_RESULT: dict | None = None
 _RUNNING: bool = False
 
 
-def _interval_minutes() -> int:
-    raw = (os.environ.get("SYNC_INTERVAL_MINUTES") or "").strip()
-    if raw:
-        try:
-            return max(1, min(1440, int(raw)))
-        except ValueError:
-            pass
-    return 30
+CRON_HOUR_UTC = 6
+CRON_MINUTE_UTC = 0
 
 
 def _next_run_utc(now: datetime) -> datetime:
-    mins = _interval_minutes()
-    # next boundary: ceil(now/mins)*mins
-    epoch = int(now.timestamp())
-    bucket = mins * 60
-    next_epoch = ((epoch // bucket) + 1) * bucket
-    return datetime.fromtimestamp(next_epoch, tz=timezone.utc)
+    candidate = now.replace(hour=CRON_HOUR_UTC, minute=CRON_MINUTE_UTC, second=0, microsecond=0)
+    if candidate <= now:
+        candidate = candidate + timedelta(days=1)
+    return candidate
 
 
 def _env_ok() -> dict:
@@ -134,7 +126,7 @@ def home():
 
     <div class="card">
       <div><strong>API</strong></div>
-      <div class="muted">Manual trigger: <code>/api/run</code> • Cron trigger: <code>/api/cron</code></div>
+      <div class="muted">Manual trigger: <code>/api/run</code> • Cron trigger: <code>/api/cron</code> (daily 06:00 UTC)</div>
     </div>
 
     <script>

@@ -176,6 +176,15 @@ When `main.py` creates the databases, they get these properties. **Garmin Daily*
 
 The workflow runs on a **cron schedule** (default: once per day at 06:00 UTC). Each run ensures DBs exist, syncs Garmin, and optionally runs Meals analysis. **GitHub allows a minimum schedule of every 5 minutes** – you can run as often as every 5 minutes by changing the cron (see 6.3).
 
+## 6b. Deploy with Vercel (Python + Cron)
+
+If you deploy this project to Vercel, the scheduler is controlled by `vercel.json`.
+On the Hobby plan, cron jobs are limited, so this repo is configured to run **once per day**:
+
+- `vercel.json`: `/api/cron` at **06:00 UTC** (`0 6 * * *`)
+
+The Vercel deployment serves a small status UI at `/` and exposes `/api/run` (manual) and `/api/cron` (scheduled).
+
 ### 6.1 Add repository secrets
 
 1. In your GitHub repo go to **Settings → Secrets and variables → Actions**.
