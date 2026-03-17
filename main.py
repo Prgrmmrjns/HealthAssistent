@@ -2,7 +2,7 @@
 
 This file also contains the Notion database helper functions (previously in notion_db.py).
 
-When not RUN_ONCE, runs every SYNC_INTERVAL_MINUTES.
+When running locally, it can loop forever (unless RUN_ONCE=1).
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import requests
 from dotenv import load_dotenv
 
-from params import RUN_MEAL_ANALYSIS, SYNC_INTERVAL_MINUTES
+from params import RUN_MEAL_ANALYSIS
 
 load_dotenv()
 
@@ -231,13 +231,16 @@ def main():
 
 
 def _sync_interval_seconds() -> float:
-    """Seconds to sleep between runs, based on SYNC_INTERVAL_MINUTES in params.py (clamped to 1–1440 minutes)."""
-    minutes = SYNC_INTERVAL_MINUTES
+    """Seconds to sleep between local daemon runs (clamped to 1–1440 minutes).
+
+    Note: deployment schedulers (e.g. Vercel Cron) control frequency separately.
+    """
+    minutes = os.environ.get("SYNC_INTERVAL_MINUTES", "").strip()
     if not isinstance(minutes, int):
         try:
-            minutes = int(minutes)
+            minutes = int(minutes) if minutes else 30
         except (TypeError, ValueError):
-            minutes = 60
+            minutes = 30
     minutes = max(1, min(1440, minutes))
     return minutes * 60.0
 

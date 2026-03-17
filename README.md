@@ -89,7 +89,7 @@ NOTION_PAGE_ID=31b4205a2f858092bdccf95ffd3212f3
 pip install -r requirements.txt
 cp .env.example .env
 # Edit .env with your values (see above)
-# Edit params.py to toggle Meals, choose model, and set sync interval
+# Edit params.py to toggle Meals and choose model
 ```
 
 ### Recommended: run everything (daemon, every full hour)
@@ -104,7 +104,7 @@ This script:
    - Ensures databases exist – creates **📊 Garmin Daily** (and **🍽️ Meals** only if `RUN_MEAL_ANALYSIS` in `params.py` is `True`) under your Notion page, only if they don’t already exist.
    - Syncs Garmin – logs into Garmin Connect and creates/updates one row per day in Garmin Daily.
    - If `RUN_MEAL_ANALYSIS` in `params.py` is `True`: analyzes Meals – finds rows with **Image** but empty **Intake**, sends the image to Mistral, and fills Intake, macros, kcals, and Meal components. If `False`, this step is skipped.
-2. **Then repeats every `SYNC_INTERVAL_MINUTES` from `params.py`** (default 60). It sleeps that long between runs until you stop it (Ctrl+C).
+2. **Then repeats on a local interval** (default 30 minutes). When running locally, you can override the sleep interval via `SYNC_INTERVAL_MINUTES` in your environment (e.g. in `.env`). On hosted schedulers (GitHub Actions / Vercel), the schedule is controlled by their cron configuration.
 
 ### Run only one part (single run, no hourly loop)
 
@@ -205,7 +205,7 @@ schedule:
   - cron: "*/5 * * * *"   # Every 5 minutes
 ```
 
-Other examples: `0 * * * *` = every hour on the hour; `0 6 * * *` = once daily at 06:00 UTC. The daemon interval (`SYNC_INTERVAL_MINUTES` in `.env`) only applies when you run `python main.py` locally; in Actions, frequency is controlled only by the workflow cron.
+Other examples: `0 * * * *` = every hour on the hour; `0 6 * * *` = once daily at 06:00 UTC. Local looping frequency can be set via `SYNC_INTERVAL_MINUTES` in your environment; in Actions/Vercel, frequency is controlled only by the respective cron.
 
 Garmin Connect login does not support 2FA for this type of access; use an app password or a dedicated account if your main account has 2FA.
 
@@ -217,5 +217,5 @@ Garmin Connect login does not support 2FA for this type of access; use an app pa
 - [ ] Notion page created; **NOTION_PAGE_ID** copied from URL.
 - [ ] Page shared with the integration (**••• → Add connections**).
 - [ ] `.env` filled with Garmin, Notion, and (optionally) Mistral keys.
-- [ ] `params.py` edited: set `RUN_MEAL_ANALYSIS`, `model`, and `SYNC_INTERVAL_MINUTES` as desired.
+- [ ] `params.py` edited: set `RUN_MEAL_ANALYSIS` and `model` as desired.
 - [ ] `pip install -r requirements.txt` and `python main.py` run at least once so **📊 Garmin Daily** (and **🍽️ Meals** if enabled) are created under that page.
