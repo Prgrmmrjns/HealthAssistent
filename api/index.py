@@ -183,14 +183,13 @@ def home():
       <div id="status" class="muted">Loading…</div>
       <div style="margin-top:12px;">
         <button id="runBtn" onclick="runNow()">Run now</button>
-        <button id="mealsBtn" style="margin-left:8px;" onclick="runMeals()">Run Meals (Mistral)</button>
       </div>
       <div id="result" style="margin-top:12px;"></div>
     </div>
 
     <div class="card">
       <div><strong>API</strong></div>
-      <div class="muted">Manual trigger: <code>/api/run</code> • Cron trigger: <code>/api/cron</code> (daily 06:00 UTC)</div>
+      <div class="muted">Manual trigger: <code>/api/run</code> • Cron trigger: <code>/api/cron</code> (daily 06:00 UTC) • Notion webhook: <code>/api/notion/webhook</code></div>
     </div>
 
     <script>
@@ -208,29 +207,15 @@ def home():
           Running: <code>${j.running}</code>
         `;
         document.getElementById('runBtn').disabled = !!j.running;
-        document.getElementById('mealsBtn').disabled = !!j.running;
       }
 
       async function runNow() {
         document.getElementById('runBtn').disabled = true;
-        document.getElementById('mealsBtn').disabled = true;
         document.getElementById('result').innerHTML = '<span class="muted">Running…</span>';
         const r = await fetch('/api/run', { method: 'POST' });
         const j = await r.json();
         document.getElementById('result').innerHTML = j.ok
           ? '<span class="good">OK: sync executed</span>'
-          : '<span class="bad">Error: ' + (j.error || 'unknown') + '</span>';
-        await refresh();
-      }
-
-      async function runMeals() {
-        document.getElementById('runBtn').disabled = true;
-        document.getElementById('mealsBtn').disabled = true;
-        document.getElementById('result').innerHTML = '<span class="muted">Running Meals…</span>';
-        const r = await fetch('/api/meals/run', { method: 'POST' });
-        const j = await r.json();
-        document.getElementById('result').innerHTML = j.ok
-          ? '<span class="good">OK: meals analysis executed</span>'
           : '<span class="bad">Error: ' + (j.error || 'unknown') + '</span>';
         await refresh();
       }
@@ -260,11 +245,6 @@ def status():
 @app.post("/api/run")
 def run():
     return JSONResponse(_run_sync())
-
-
-@app.post("/api/meals/run")
-def run_meals():
-    return JSONResponse(_run_meals_only())
 
 
 @app.post("/api/notion/webhook")
