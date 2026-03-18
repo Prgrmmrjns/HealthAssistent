@@ -91,16 +91,6 @@ def _run_meals_only() -> dict:
         _RUNNING = False
 
 
-def _verify_webhook_secret(request: Request) -> None:
-    expected = (os.environ.get("NOTION_WEBHOOK_SECRET") or "").strip()
-    if not expected:
-        # If not configured, accept (but strongly recommended to set in Vercel env).
-        return
-    got = (request.headers.get("x-webhook-secret") or "").strip()
-    if got != expected:
-        raise HTTPException(status_code=401, detail="Invalid webhook secret")
-
-
 def _extract_notion_page_id(payload: dict) -> str | None:
     """
     Best-effort extraction for Notion automations.
@@ -281,10 +271,8 @@ def run_meals():
 async def notion_webhook(request: Request):
     """
     Notion Automation webhook target.
-    - Protect with header: x-webhook-secret: <NOTION_WEBHOOK_SECRET>
     - Payload should include a page id (best-effort extraction).
     """
-    _verify_webhook_secret(request)
     payload = {}
     try:
         payload = await request.json()
