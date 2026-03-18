@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 
 app = FastAPI()
@@ -89,6 +89,80 @@ def _run_meals_only() -> dict:
         return _LAST_RESULT
     finally:
         _RUNNING = False
+
+
+def _verify_webhook_secret(request: Request) -> None:
+    expected = (os.environ.get("NOTION_WEBHOOK_SECRET") or "").strip()
+    if not expected:
+        # If not configured, accept (but strongly recommended to set in Vercel env).
+        return
+    got = (request.headers.get("x-webhook-secret") or "").strip()
+    if got != expected:
+        raise HTTPException(status_code=401, detail="Invalid webhook secret")
+
+
+def _extract_notion_page_id(payload: dict) -> str | None:
+    """
+    Best-effort extraction for Notion automations.
+    Supports:
+      - {"page_id": "..."} / {"pageId": "..."} / {"id": "..."}
+      - nested: {"data": {"page_id": ...}} / {"page": {"id": ...}}
+    """
+    if not isinstance(payload, dict):
+        return None
+    for k in ("page_id", "pageId", "id"):
+        v = payload.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    data = payload.get("data")
+    if isinstance(data, dict):
+        for k in ("page_id", "pageId", "id"):
+            v = data.get(k)
+            if isinstance(v, str) and v.strip():
+                return v.strip()
+    page = payload.get("page")
+    if isinstance(page, dict):
+        v = page.get("id")
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return None
+
+
+def _run_meals_for_page_id(page_id: str) -> dict:
+    # Uses existing sync_meals helpers to do a single-page run.
+    notion_key = (os.environ.get("NOTION_API_KEY") or "").strip()
+    mistral_key = (os.environ.get("MISTRAL_AI_API_KEY") or "").strip()
+    page_id = (page_id or "").strip()
+    if not notion_key or not mistral_key or not page_id:
+        return {"ok": False, "error": "Missing NOTION_API_KEY, MISTRAL_AI_API_KEY, or page_id"}
+
+    try:
+        from main import get_meals_db_id
+        from sync_meals import (
+            analyze_food_image,
+            fetch_image_as_base64,
+            get_image_url_from_page,
+            update_meal_page,
+        )
+
+        db_id = get_meals_db_id(notion_key, os.environ.get("NOTION_PAGE_ID", "").strip())
+        if not db_id:
+            return {"ok": False, "error": "Meals database not found (set MEALS_DB_ID or NOTION_PAGE_ID)"}
+
+        img_url = get_image_url_from_page(notion_key, page_id)
+        if not img_url:
+            return {"ok": False, "error": "No image URL found on page"}
+        b64_mime = fetch_image_as_base64(img_url, notion_key)
+        if not b64_mime:
+            return {"ok": False, "error": "Could not fetch image"}
+        b64, mime = b64_mime
+        result = analyze_food_image(b64, mime, mistral_key)
+        if not result:
+            return {"ok": False, "error": "Mistral returned empty result"}
+        update_meal_page(notion_key, page_id, result, db_id)
+        return {"ok": True, "page_id": page_id, "description": (result.get("description") or "")[:120]}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -200,6 +274,27 @@ def run():
 
 @app.post("/api/meals/run")
 def run_meals():
+    return JSONResponse(_run_meals_only())
+
+
+@app.post("/api/notion/webhook")
+async def notion_webhook(request: Request):
+    """
+    Notion Automation webhook target.
+    - Protect with header: x-webhook-secret: <NOTION_WEBHOOK_SECRET>
+    - Payload should include a page id (best-effort extraction).
+    """
+    _verify_webhook_secret(request)
+    payload = {}
+    try:
+        payload = await request.json()
+    except Exception:
+        payload = {}
+
+    page_id = _extract_notion_page_id(payload)
+    if page_id:
+        return JSONResponse(_run_meals_for_page_id(page_id))
+    # Fallback: run the normal meals scan (Image set + Intake empty).
     return JSONResponse(_run_meals_only())
 
 
